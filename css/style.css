@@ -67,21 +67,24 @@
     padding:18px 18px 22px;
     border-bottom: 3px solid var(--gold);
   }
-  .top-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
-  .brand{display:flex; align-items:center; gap:10px;}
+  .top-row{display:flex; flex-direction:column; align-items:stretch; gap:12px;}
+  .brand{display:flex; align-items:center; gap:10px; min-width:0;}
   .stamp{
     width:34px; height:34px; border-radius:50%;
     border:2px solid var(--gold-soft);
     display:flex; align-items:center; justify-content:center;
-    font-size:16px;
+    font-size:16px; flex-shrink:0;
   }
-  .brand-text .title{font-size:15px; font-weight:700; letter-spacing:.8px;}
-  .brand-text .subtitle{font-size:11px; opacity:.65; letter-spacing:.5px; text-transform:uppercase;}
+  .brand-text{min-width:0;}
+  .brand-text .title{font-size:15px; font-weight:700; letter-spacing:.8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .brand-text .subtitle{font-size:11px; opacity:.65; letter-spacing:.5px; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 
-  .month-nav{display:flex; align-items:center; gap:8px;}
+  .month-nav{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .month-switcher{display:flex; align-items:center; gap:8px;}
+  .header-actions{display:flex; align-items:center; gap:8px;}
   .month-nav button{
     background:rgba(246,241,228,0.12); color:var(--paper); border:1px solid rgba(246,241,228,0.25);
-    width:30px; height:30px; border-radius:8px; font-size:16px; cursor:pointer;
+    width:30px; height:30px; border-radius:8px; font-size:16px; cursor:pointer; flex-shrink:0;
   }
   .month-label{font-size:12.5px; width:96px; flex-shrink:0; text-align:center; font-weight:600; letter-spacing:.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 

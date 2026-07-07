@@ -34,11 +34,15 @@
       </div>
     </div>
     <div class="month-nav">
-      <button onclick="changeMonth(-1)">‹</button>
-      <div class="month-label" id="monthLabel">—</div>
-      <button onclick="changeMonth(1)">›</button>
-      <button class="refresh-btn" id="refreshBtn" onclick="refreshData()" title="Atualizar dados"><span class="ic">🔄</span></button>
-      <button class="refresh-btn" onclick="openSettings()" title="Configurar sincronização"><span class="ic">⚙️</span></button>
+      <div class="month-switcher">
+        <button onclick="changeMonth(-1)">‹</button>
+        <div class="month-label" id="monthLabel">—</div>
+        <button onclick="changeMonth(1)">›</button>
+      </div>
+      <div class="header-actions">
+        <button class="refresh-btn" id="refreshBtn" onclick="refreshData()" title="Atualizar dados"><span class="ic">🔄</span></button>
+        <button class="refresh-btn" onclick="openSettings()" title="Configurar sincronização"><span class="ic">⚙️</span></button>
+      </div>
     </div>
   </div>
   <div class="balance-block">
@@ -134,7 +138,7 @@
     <button class="close-x" onclick="closeSettings()">✕</button>
     <h3>Sincronização entre os celulares</h3>
     <div class="info-note" style="margin-top:0; text-align:left;">
-      Cole aqui o link do "Web App" do Google Apps Script conectado à planilha de vocês no Drive. Faça isso em cada aparelho (seu celular, o da Vanessa e o notebook) usando a mesma URL.
+      Cole aqui o link do "Web App" do Google Apps Script conectado à planilha de vocês. Faça isso em cada aparelho (seu celular, o da Vanessa e o notebook) usando a mesma URL.
     </div>
     <label>Link do Apps Script (Web App URL)</label>
     <input type="text" id="fApiUrl" placeholder="https://script.google.com/macros/s/.../exec">
