@@ -186,9 +186,9 @@
 
   /* Bottom nav */
   nav.bottom{
-    flex:0 0 auto;
+    flex:0 0 auto; position:relative; z-index:40;
     background:var(--ink); border-top:3px solid var(--gold);
-    display:flex; padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+    display:flex; align-items:flex-end; padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
   }
   nav.bottom button{
     flex:1; background:none; border:none; color:var(--paper); opacity:.55;
@@ -199,14 +199,17 @@
   nav.bottom button.active{opacity:1;}
   nav.bottom button.active .ic{color:var(--gold-soft);}
 
-  .fab{
-    position:absolute; right:18px; z-index:40;
-    bottom: calc(84px + env(safe-area-inset-bottom));
-    width:56px; height:56px; border-radius:50%;
-    background:var(--gold); color:var(--ink); border:none;
-    font-size:28px; box-shadow:0 6px 16px rgba(184,144,46,0.45);
-    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  .fab-btn{
+    flex:0 0 auto !important;
+    width:54px; height:54px; border-radius:50%;
+    background:var(--gold) !important; opacity:1 !important;
+    box-shadow:0 6px 16px rgba(184,144,46,0.5), 0 0 0 5px var(--paper);
+    transform:translateY(-16px);
+    margin:0 6px;
+    padding:0 !important;
   }
+  .fab-btn .ic{font-size:26px; color:var(--ink); font-weight:700;}
+  .fab-btn:active{transform:translateY(-14px) scale(.96);}
 
   /* Modal */
   .modal-bg{
