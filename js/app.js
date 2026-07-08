@@ -22,6 +22,14 @@ function showToast(msg){
   setTimeout(()=>t.classList.remove('show'), 1800);
 }
 
+function abrirMenuFerramentas(){ document.getElementById('toolsBg')?.classList.add('open'); }
+function fecharMenuFerramentas(){ document.getElementById('toolsBg')?.classList.remove('open'); }
+function abrirScannerDireto(){
+  const input = document.getElementById('quickComprovante');
+  if(input) input.click();
+  else abrirCameraComprovante();
+}
+
 async function loadAll(){
   entradas = await storageGet('entradas');
   gastos = await storageGet('gastos');
@@ -490,6 +498,7 @@ function render(){
   const main = document.getElementById('mainContent');
   if(currentTab==='resumo') main.innerHTML = renderResumo(d);
   else if(currentTab==='historico') main.innerHTML = renderHistorico(d);
+  else if(currentTab==='graficos') main.innerHTML = renderGraficos(d);
   else main.innerHTML = renderOrcamento(d);
 
   if(currentTab==='orcamento'){
@@ -507,8 +516,13 @@ function render(){
 
 function renderResumo(d){
   return `
-    <div class="action-row">
-      <div class="action-btn primary" onclick="gerarRelatorio()">📄 Relatório PDF do mês</div>
+    <div class="hero-actions">
+      <label class="hero-btn camera" for="quickComprovante"><span>📷</span><b>Escanear comprovante</b><small>Câmera + IA local para preencher o gasto</small></label>
+      <button class="hero-btn" onclick="openModal()"><span>➕</span><b>Novo lançamento</b><small>Entrada ou gasto manual</small></button>
+    </div>
+    <div class="action-row compact">
+      <div class="action-btn" onclick="switchTab('graficos')">📊 Gráficos</div>
+      <div class="action-btn primary" onclick="gerarRelatorio()">📄 PDF do mês</div>
       <div class="action-btn" onclick="exportarBackup()">💾 Backup</div>
     </div>
     <div class="grid2">
@@ -565,6 +579,68 @@ function renderResumo(d){
         </div>`;
       }).join('') : `<div class="empty-state"><div class="big">🗒️</div>Nenhum gasto registrado neste mês.</div>`}
     </div>
+  `;
+}
+
+function gerarInsights(d){
+  const msgs = [];
+  const topCat = Object.entries(d.porCategoria).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1])[0];
+  if(d.saldo < 0) msgs.push('Atenção: o mês está negativo. Priorize revisar gastos supérfluos e compras no crédito.');
+  else if(d.taxaPoupanca >= 20) msgs.push('Ótimo controle: vocês estão guardando pelo menos 20% da renda do mês.');
+  else if(d.totalEnt > 0) msgs.push('Saldo positivo, mas a poupança está abaixo de 20%. Uma pequena meta de corte já melhora bastante.');
+  if(topCat) msgs.push('Maior categoria de gasto: ' + topCat[0] + ' (' + brl(topCat[1]) + ').');
+  if(d.superfluo > 0 && d.totalGas > 0 && d.superfluo/d.totalGas > .3) msgs.push('Supérfluos acima de 30% dos gastos. Vale definir limite para lazer/compras.');
+  if(!msgs.length) msgs.push('Sem dados suficientes neste mês. Lance alguns gastos para a análise ficar mais precisa.');
+  return msgs;
+}
+
+function renderMiniPie(d){
+  const total = d.totalGas || 0;
+  const cats = Object.entries(d.porCategoria).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  if(!total || !cats.length) return '<div class="empty-state"><div class="big">📊</div>Sem gastos para montar o gráfico.</div>';
+  let acc = 0;
+  const colors = ['#B8902E','#2F6B4F','#A83A2E','#3B6E8F','#A14C6B','#7A6A42'];
+  const gradients = cats.map(([c,v],i)=>{ const start=acc; const end=acc+(v/total)*100; acc=end; return `${colors[i]} ${start}% ${end}%`; }).join(',');
+  return `<div class="chart-card"><div class="pie" style="background:conic-gradient(${gradients});"></div><div class="legend">${cats.map(([c,v],i)=>`<div><i style="background:${colors[i]}"></i><span>${esc(c)}</span><b>${brl(v)}</b></div>`).join('')}</div></div>`;
+}
+
+function monthSeries(){
+  const out=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(viewDate); d.setMonth(viewDate.getMonth()-i);
+    const key=monthKey(d);
+    const label=d.toLocaleDateString('pt-BR',{month:'short'}).replace('.','');
+    const ent=entradas.filter(e=>(e.data||'').slice(0,7)===key).reduce((s,e)=>s+Number(e.valor||0),0);
+    const gas=gastos.filter(g=>(g.data||'').slice(0,7)===key).reduce((s,g)=>s+Number(g.valor||0),0);
+    out.push({label, ent, gas, saldo:ent-gas});
+  }
+  return out;
+}
+
+function renderBars(series){
+  const max=Math.max(1,...series.flatMap(x=>[x.ent,x.gas,Math.abs(x.saldo)]));
+  return `<div class="bar-chart">${series.map(x=>`<div class="bar-col"><div class="bars"><i class="in" style="height:${Math.max(3,(x.ent/max)*100)}%"></i><i class="out" style="height:${Math.max(3,(x.gas/max)*100)}%"></i></div><small>${esc(x.label)}</small></div>`).join('')}</div><div class="chart-hint"><span class="dot in"></span>Entradas <span class="dot out"></span>Gastos</div>`;
+}
+
+function renderGraficos(d){
+  const insights = gerarInsights(d);
+  return `
+    <div class="section-title">Gráficos e análise<span class="rule"></span></div>
+    <div class="insight-card"><div class="insight-title">🤖 Análise financeira automática</div>${insights.map(x=>`<p>${esc(x)}</p>`).join('')}</div>
+    <div class="grid2">
+      <div class="card in"><div class="k">Entradas</div><div class="v">${brl(d.totalEnt)}</div></div>
+      <div class="card out"><div class="k">Gastos</div><div class="v">${brl(d.totalGas)}</div></div>
+    </div>
+    <div class="section-title">Pizza por categoria<span class="rule"></span></div>
+    ${renderMiniPie(d)}
+    <div class="section-title">Evolução dos últimos 6 meses<span class="rule"></span></div>
+    <div class="chart-card">${renderBars(monthSeries())}</div>
+    <div class="section-title">Pessoa no mês<span class="rule"></span></div>
+    <div class="person-row">
+      <div class="person-card fernando"><div class="avatar fernando">F</div><div><div class="name">Fernando</div><div class="amt">${brl(d.porPessoaGasto.FERNANDO||0)}</div></div></div>
+      <div class="person-card vanessa"><div class="avatar vanessa">V</div><div><div class="name">Vanessa</div><div class="amt">${brl(d.porPessoaGasto.VANESSA||0)}</div></div></div>
+    </div>
+    <div class="action-row" style="margin-top:16px"><div class="action-btn primary" onclick="gerarRelatorio()">📄 Gerar PDF do mês</div></div>
   `;
 }
 
@@ -818,7 +894,7 @@ async function processarComprovante(file){
     const conf = Math.round(data.confidence || 0);
     if(result){
       result.innerHTML = `
-        <b>Preenchi o lançamento automaticamente.</b><br>
+        <b>IA local preencheu o lançamento automaticamente.</b><br>
         Valor: <b>${valor ? brl(valor) : 'não identificado'}</b> · Data: <b>${fmtData(dataIso)}</b> · Pagamento: <b>${esc(forma)}</b><br>
         Categoria sugerida: <b>${esc(sug.categoria)}</b> · Descrição: <b>${esc(sug.descricao)}</b>
         <div class="scan-confidence">Precisão OCR aproximada: ${conf}%</div>

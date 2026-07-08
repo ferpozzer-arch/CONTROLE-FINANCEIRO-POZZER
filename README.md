@@ -1,64 +1,36 @@
-# Controle Financeiro Pozzer
+# Controle Financeiro Pro · Fernando & Vanessa
 
-PWA de controle financeiro para casal/família, com uso em celular e computador, funcionamento offline e sincronização opcional via Google Sheets + Google Apps Script.
+Versão profissional com foco em uso real no celular e no PC.
 
-## O que o app já entrega
+## Principais melhorias
 
-- Lançamentos de entradas e gastos por data, pessoa, categoria, forma de pagamento e tipo de gasto.
-- Dashboard mensal com saldo, entradas, gastos, orçamento e taxa de poupança.
-- Histórico mensal com edição e exclusão de lançamentos.
-- Orçamento por categoria.
+- Botão grande de **Escanear comprovante** na tela inicial.
+- Scanner por câmera do celular usando OCR com Tesseract.js.
+- Interpretação automática local: valor, data, forma de pagamento, categoria e descrição.
+- Fluxo seguro: o app preenche os campos, mas vocês conferem antes de salvar.
+- Tela de **Gráficos** separada para não poluir a tela principal.
+- Gráfico de pizza por categoria, evolução dos últimos 6 meses e comparação por pessoa.
+- **PDF/relatório mensal** para imprimir ou salvar.
+- Menu de ferramentas com Scanner, Gráficos, PDF e Backup.
+- Interface melhorada para desktop/tablet.
 - Backup e restauração em JSON.
-- Relatório mensal para impressão/PDF.
-- Instalação como aplicativo PWA em Android, iPhone e desktop.
-- Layout responsivo para celular, tablet e PC.
-- Scanner de comprovante pelo celular: abre a câmera, roda OCR com Tesseract.js e pré-preenche valor, data, forma de pagamento, categoria e descrição para conferência.
+- Sincronização opcional via Google Sheets + Apps Script.
 
-## Como rodar localmente
+## Importante para câmera
 
-Use um servidor local, porque Service Worker/PWA não funciona corretamente abrindo o `index.html` direto pelo arquivo.
+No celular, a câmera só abre de forma confiável quando o app está em **HTTPS** ou instalado como PWA a partir de um endereço seguro.
 
-```bash
-python3 -m http.server 8080
-```
+Não teste abrindo o arquivo `index.html` diretamente pelo explorador de arquivos do celular, porque muitos navegadores bloqueiam câmera nesse modo.
 
-Depois acesse `http://localhost:8080` dentro da pasta do projeto.
+## Como testar
 
-## Como publicar
+1. Publique a pasta em um servidor HTTPS, GitHub Pages, Netlify, Vercel ou similar.
+2. Abra o app no celular.
+3. Toque em **Escanear comprovante**.
+4. Tire a foto do comprovante.
+5. Confira os campos preenchidos.
+6. Toque em **Salvar lançamento**.
 
-Opções simples:
+## Google Sheets
 
-1. GitHub Pages
-2. Netlify
-3. Vercel
-4. Hospedagem própria com HTTPS
-
-HTTPS é necessário para instalação PWA e Service Worker fora de `localhost`.
-
-## Sincronização com Google Sheets
-
-1. Crie uma planilha no Google Sheets.
-2. Abra **Extensões > Apps Script**.
-3. Cole o conteúdo de `apps-script.gs`.
-4. Publique como **Web App** com acesso para “qualquer pessoa com o link”.
-5. Copie a URL terminada em `/exec`.
-6. No app, toque em ⚙️ e cole essa URL.
-
-## Scanner de comprovantes
-
-No botão **Escanear comprovante da maquininha**, o app usa a câmera do celular e a biblioteca Tesseract.js carregada via CDN. Por isso, para o OCR funcionar pela primeira vez, o aparelho precisa de internet. A captura de câmera exige HTTPS em hospedagem pública. Depois da leitura, o app apenas pré-preenche os campos: o usuário deve conferir e tocar em **Salvar lançamento**.
-
-Dicas para melhor leitura:
-
-- Tire a foto com boa iluminação.
-- Deixe o comprovante reto e ocupando boa parte da tela.
-- Confira valor e data antes de salvar, porque OCR pode errar números.
-
-## Próximas melhorias profissionais recomendadas
-
-- Autenticação com login próprio, caso vá ser usado por mais famílias/clientes.
-- Banco de dados real, como Supabase/Firebase/PostgreSQL, se quiser escalar além de uso familiar.
-- Parcelamentos de cartão, contas recorrentes e metas.
-- Importação CSV/OFX de bancos.
-- Controle de investimentos/reserva de emergência.
-- Testes automatizados e pipeline de deploy.
+Use o arquivo `apps-script.gs` dentro do Google Apps Script da sua planilha e publique como Web App. Depois cole a URL no botão ⚙️ do aplicativo.
