@@ -1,36 +1,34 @@
-# Controle Financeiro Pro · Fernando & Vanessa
+# Controle Financeiro Pro — IA, SMS, Gráficos e PDF
 
-Versão profissional com foco em uso real no celular e no PC.
+Aplicativo PWA para controle financeiro de Fernando & Vanessa, funcionando no celular e no PC.
 
-## Principais melhorias
+## Principais recursos
 
-- Botão grande de **Escanear comprovante** na tela inicial.
-- Scanner por câmera do celular usando OCR com Tesseract.js.
-- Interpretação automática local: valor, data, forma de pagamento, categoria e descrição.
-- Fluxo seguro: o app preenche os campos, mas vocês conferem antes de salvar.
-- Tela de **Gráficos** separada para não poluir a tela principal.
-- Gráfico de pizza por categoria, evolução dos últimos 6 meses e comparação por pessoa.
-- **PDF/relatório mensal** para imprimir ou salvar.
-- Menu de ferramentas com Scanner, Gráficos, PDF e Backup.
-- Interface melhorada para desktop/tablet.
-- Backup e restauração em JSON.
+- Lançamento manual de gastos e entradas.
+- Botão principal **IA do comprovante** na tela inicial.
+- Câmera do celular para fotografar comprovantes de maquininha.
+- OCR local com Tesseract.js para sugerir valor, data, forma de pagamento, categoria e descrição.
+- Importador de SMS: cole a mensagem recebida do cartão e o app preenche o gasto automaticamente.
+- Histórico mensal.
+- Gráficos em tela separada.
+- PDF do mês para imprimir ou salvar.
+- Backup em JSON.
 - Sincronização opcional via Google Sheets + Apps Script.
 
-## Importante para câmera
+## Sobre SMS automático
 
-No celular, a câmera só abre de forma confiável quando o app está em **HTTPS** ou instalado como PWA a partir de um endereço seguro.
+Por segurança, navegadores/PWAs não têm permissão para ler todos os SMS do celular automaticamente. A alternativa segura nesta versão é copiar a mensagem do cartão e colar em **Ferramentas > Importar SMS**. O app interpreta o texto e abre o lançamento já preenchido para conferência.
 
-Não teste abrindo o arquivo `index.html` diretamente pelo explorador de arquivos do celular, porque muitos navegadores bloqueiam câmera nesse modo.
+Para leitura totalmente automática de SMS seria necessário transformar o projeto em app Android nativo com permissão específica de SMS, o que exige publicação/instalação fora do navegador e revisão de privacidade.
 
-## Como testar
+## Câmera no celular
 
-1. Publique a pasta em um servidor HTTPS, GitHub Pages, Netlify, Vercel ou similar.
-2. Abra o app no celular.
-3. Toque em **Escanear comprovante**.
-4. Tire a foto do comprovante.
-5. Confira os campos preenchidos.
-6. Toque em **Salvar lançamento**.
+A câmera funciona melhor quando o app está publicado em HTTPS. Abrir o `index.html` diretamente como arquivo pode bloquear a câmera.
 
-## Google Sheets
+## Instalação
 
-Use o arquivo `apps-script.gs` dentro do Google Apps Script da sua planilha e publique como Web App. Depois cole a URL no botão ⚙️ do aplicativo.
+1. Publique os arquivos em um serviço com HTTPS, como GitHub Pages, Netlify, Vercel ou servidor próprio.
+2. Abra o endereço no celular.
+3. Use “Adicionar à tela inicial”.
+4. Configure a sincronização em ⚙️ usando o Web App URL do Apps Script.
+

@@ -278,6 +278,67 @@ function openModal(){
 }
 function closeModal(){ document.getElementById('modalBg').classList.remove('open'); }
 
+function abrirImportadorSMS(){
+  const bg = document.getElementById('smsBg');
+  const txt = document.getElementById('smsTexto');
+  if(txt) txt.value = '';
+  if(bg) bg.classList.add('open');
+}
+function fecharImportadorSMS(){
+  const bg = document.getElementById('smsBg');
+  if(bg) bg.classList.remove('open');
+}
+
+function extrairDadosSMS(texto){
+  const raw = String(texto||'');
+  const up = raw.toUpperCase();
+  const valor = extrairValorComprovante(raw) || (()=>{
+    const m = raw.match(/(?:R\$|BRL|VALOR(?:\s+DE)?|COMPRA(?:\s+DE)?)[^0-9]{0,12}([0-9]{1,6}(?:[.,][0-9]{2}))/i);
+    return m ? parseFloat(m[1].replace('.','').replace(',','.')) : null;
+  })();
+  const dataIso = extrairDataComprovante(raw) || new Date().toISOString().slice(0,10);
+  let forma = 'Cartão Crédito';
+  if(/DEBITO|DÉBITO|DEB\b/.test(up)) forma = 'Cartão Débito';
+  if(/PIX/.test(up)) forma = 'Pix';
+  const partes = raw.split(/\s+(?:EM|NO|NA|N[OA]|ESTABELECIMENTO|LOCAL|COMPRA)\s+/i);
+  let descricao = '';
+  if(partes.length>1){
+    descricao = partes[partes.length-1]
+      .replace(/\s+(?:NO\s+)?VALOR.*$/i,'')
+      .replace(/\s+R\$.*$/i,'')
+      .replace(/\s+EM\s+\d{1,2}[\/\-]\d{1,2}.*$/i,'')
+      .replace(/\s+AS\s+\d{1,2}:\d{2}.*$/i,'')
+      .trim();
+  }
+  if(!descricao){
+    const m = raw.match(/(?:CARTAO|CARTÃO|COMPRA|APROVADA|AUTORIZADA).*?(?:EM|NO|NA)\s+([A-Z0-9 &.\-]{4,50})/i);
+    descricao = m ? m[1].trim() : 'Compra por SMS';
+  }
+  descricao = descricao.replace(/[^\p{L}\p{N} &.\-]/gu,' ').replace(/\s+/g,' ').trim().slice(0,48) || 'Compra por SMS';
+  const sug = sugerirCategoriaDescricao(descricao + '\n' + raw);
+  return {valor, dataIso, forma, categoria:sug.categoria || 'Outros', descricao: descricao || sug.descricao || 'Compra por SMS'};
+}
+
+function preencherLancamentoComDados(dados){
+  openModal();
+  setTxType('gasto');
+  if(dados.dataIso) document.getElementById('fData').value = dados.dataIso;
+  if(dados.valor) document.getElementById('fValor').value = Number(dados.valor).toFixed(2);
+  if(dados.categoria) document.getElementById('fCategoria').value = dados.categoria;
+  if(dados.forma) document.getElementById('fForma').value = dados.forma;
+  if(dados.descricao) document.getElementById('fDescricao').value = dados.descricao;
+  document.getElementById('fTipoGasto').value = 'Necessário';
+}
+
+function processarSMSManual(){
+  const texto = document.getElementById('smsTexto')?.value || '';
+  if(texto.trim().length < 8){ showToast('Cole o SMS do cartão primeiro.'); return; }
+  const dados = extrairDadosSMS(texto);
+  fecharImportadorSMS();
+  preencherLancamentoComDados(dados);
+  showToast(dados.valor ? 'SMS interpretado. Confira e salve.' : 'Não achei o valor. Confira os campos.');
+}
+
 async function saveTransaction(){
   const valor = parseFloat(document.getElementById('fValor').value);
   const data = document.getElementById('fData').value;
@@ -517,7 +578,7 @@ function render(){
 function renderResumo(d){
   return `
     <div class="hero-actions">
-      <label class="hero-btn camera" for="quickComprovante"><span>📷</span><b>Escanear comprovante</b><small>Câmera + IA local para preencher o gasto</small></label>
+      <label class="hero-btn camera" for="quickComprovante"><span>📷</span><b>IA do comprovante</b><small>Abre a câmera e preenche o gasto automaticamente</small></label>
       <button class="hero-btn" onclick="openModal()"><span>➕</span><b>Novo lançamento</b><small>Entrada ou gasto manual</small></button>
     </div>
     <div class="action-row compact">

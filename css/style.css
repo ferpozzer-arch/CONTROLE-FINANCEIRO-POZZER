@@ -456,7 +456,7 @@
 .scan-confidence{display:inline-flex; align-items:center; gap:4px; margin-top:6px; font-size:11px; opacity:.8;}
 @media (min-width:900px){.scan-preview img{width:96px;height:96px}.scan-card{padding:14px}}
 
-/* Botão rápido de scanner sempre visível no celular */
+/* Inputs escondidos usados pelos botões grandes de câmera */
 .scan-file-input{
   position:absolute;
   width:1px;
@@ -464,39 +464,6 @@
   opacity:0;
   pointer-events:none;
 }
-.quick-scan-wrap{
-  position:fixed;
-  left:16px;
-  right:16px;
-  bottom:calc(82px + env(safe-area-inset-bottom));
-  z-index:45;
-  display:flex;
-  justify-content:center;
-  pointer-events:none;
-}
-.quick-scan-floating{
-  pointer-events:auto;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:10px;
-  width:min(420px, 100%);
-  min-height:54px;
-  border-radius:18px;
-  border:1px solid rgba(184,144,46,.45);
-  background:var(--gold);
-  color:var(--ink);
-  font-family:'IBM Plex Sans', sans-serif;
-  font-weight:900;
-  font-size:15px;
-  box-shadow:0 14px 34px rgba(28,51,43,.26);
-  cursor:pointer;
-  -webkit-tap-highlight-color:transparent;
-}
-.quick-scan-floating span{font-size:22px;}
-body:has(.modal-bg.show) .quick-scan-wrap{display:none;}
-
-@media (min-width:900px){.quick-scan-wrap{left:auto;right:32px;bottom:32px;width:300px}.quick-scan-floating{width:300px}}
 
 /* ===== Melhorias Pro: ações principais, ferramentas e gráficos ===== */
 .hero-actions{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:12px;}
@@ -537,3 +504,25 @@ body:has(.modal-bg.open) .quick-scan-wrap{display:none;}
 
 @media (min-width:640px){.hero-actions{grid-template-columns:1.2fr .8fr}.tool-grid{grid-template-columns:1fr 1fr}.pie{width:190px;height:190px}.bars i{width:18px}}
 @media (min-width:900px){nav.bottom{width:270px}.hero-actions{grid-template-columns:1.2fr .8fr}.chart-card{padding:20px}.bar-chart{height:230px}.bars{height:185px}}
+
+.sms-modal textarea{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:13px 14px;
+  background:#fff;
+  color:var(--ink);
+  font-family:'IBM Plex Sans',sans-serif;
+  font-size:15px;
+  resize:vertical;
+  min-height:120px;
+}
+.secondary-btn{
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:#fff;
+  color:var(--ink);
+  font-weight:800;
+  padding:13px 14px;
+  font-family:'IBM Plex Sans',sans-serif;
+}

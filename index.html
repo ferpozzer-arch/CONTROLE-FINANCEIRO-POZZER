@@ -58,10 +58,7 @@
 
 <main id="mainContent"></main>
 
-<div class="quick-scan-wrap" aria-label="Escanear comprovante">
-  <input type="file" id="quickComprovante" accept="image/*" capture="environment" class="scan-file-input" onchange="capturarComprovanteRapido(this)">
-  <label class="quick-scan-floating" for="quickComprovante"><span>📷</span> Escanear comprovante</label>
-</div>
+<input type="file" id="quickComprovante" accept="image/*" capture="environment" class="scan-file-input" onchange="capturarComprovanteRapido(this)">
 
 <nav class="bottom">
   <button class="navbtn active" data-tab="resumo" onclick="switchTab('resumo')"><span class="ic">🏠</span>Início</button>
@@ -160,11 +157,29 @@
     <h3>Ferramentas</h3>
     <div class="tool-grid">
       <label class="tool-card camera" for="toolComprovante"><span>📷</span><b>Escanear comprovante</b><small>Abre a câmera e preenche valor, data e categoria.</small></label>
+      <button class="tool-card" onclick="fecharMenuFerramentas(); abrirImportadorSMS()"><span>💬</span><b>Importar SMS</b><small>Cole a mensagem do cartão e o app preenche o gasto.</small></button>
       <button class="tool-card" onclick="fecharMenuFerramentas(); switchTab('graficos')"><span>📊</span><b>Gráficos</b><small>Pizza, evolução e comparação por pessoa.</small></button>
       <button class="tool-card" onclick="fecharMenuFerramentas(); gerarRelatorio()"><span>📄</span><b>PDF do mês</b><small>Relatório pronto para imprimir ou salvar.</small></button>
       <button class="tool-card" onclick="fecharMenuFerramentas(); exportarBackup()"><span>💾</span><b>Backup</b><small>Baixa todos os dados em arquivo JSON.</small></button>
     </div>
     <input type="file" id="toolComprovante" accept="image/*" capture="environment" class="scan-file-input" onchange="capturarComprovanteRapido(this); fecharMenuFerramentas();">
+  </div>
+</div>
+
+
+<div class="modal-bg" id="smsBg" onclick="if(event.target===this)fecharImportadorSMS()">
+  <div class="modal sms-modal">
+    <button class="close-x" onclick="fecharImportadorSMS()">✕</button>
+    <h3>Importar gasto por SMS</h3>
+    <div class="info-note" style="margin-top:0; text-align:left;">
+      Por segurança, o navegador não consegue ler seus SMS sozinho. Copie a mensagem do banco/cartão e cole aqui. O app identifica valor, data, estabelecimento e forma de pagamento.
+    </div>
+    <label>Mensagem recebida do cartão</label>
+    <textarea id="smsTexto" rows="6" placeholder="Ex: Compra aprovada no cartão final 1234 em MERCADO ABC no valor de R$ 157,32 em 08/07 às 14:22"></textarea>
+    <div class="row2" style="margin-top:12px;">
+      <button class="secondary-btn" type="button" onclick="fecharImportadorSMS()">Cancelar</button>
+      <button class="save-btn" type="button" onclick="processarSMSManual()">Preencher lançamento</button>
+    </div>
   </div>
 </div>
 
