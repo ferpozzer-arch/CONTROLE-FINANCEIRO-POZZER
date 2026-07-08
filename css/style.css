@@ -413,3 +413,30 @@
   .cat-list{grid-template-columns:repeat(3,minmax(240px,1fr));}
   .tx-list{grid-template-columns:repeat(2,minmax(320px,1fr));}
 }
+
+/* Scanner de comprovantes */
+.scan-card{
+  margin:14px 0 16px;
+  border:1px solid var(--line);
+  background:rgba(184,144,46,.08);
+  border-radius:18px;
+  padding:12px;
+}
+.scan-main-btn{
+  width:100%; border:0; border-radius:14px; padding:13px 14px;
+  background:var(--ink); color:var(--paper); font-weight:800;
+  font-family:'IBM Plex Sans', sans-serif; cursor:pointer;
+}
+.scan-main-btn:disabled{opacity:.55; cursor:not-allowed;}
+.scan-preview{display:flex; gap:12px; align-items:center; margin-top:12px;}
+.scan-preview img{width:82px; height:82px; object-fit:cover; border-radius:14px; border:1px solid var(--line); background:#fff;}
+.scan-meta{flex:1; min-width:0; font-size:12px; color:var(--ink-soft); line-height:1.35;}
+.scan-title{font-weight:800; color:var(--ink); margin-bottom:4px;}
+.scan-progress{height:8px; border-radius:99px; background:rgba(28,51,43,.12); overflow:hidden; margin-top:8px;}
+.scan-progress div{height:100%; width:0%; background:var(--gold); transition:width .2s ease;}
+.scan-result{margin-top:10px; padding:10px; border-radius:14px; background:rgba(255,255,255,.45); color:var(--ink-soft); font-size:12px; line-height:1.45;}
+.scan-result b{color:var(--ink);}
+.scan-actions{display:flex; gap:8px; margin-top:10px;}
+.scan-actions button{flex:1; border:1px solid var(--line); background:var(--paper); color:var(--ink); border-radius:12px; padding:9px; font-weight:700;}
+.scan-confidence{display:inline-flex; align-items:center; gap:4px; margin-top:6px; font-size:11px; opacity:.8;}
+@media (min-width:900px){.scan-preview img{width:96px;height:96px}.scan-card{padding:14px}}

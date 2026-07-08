@@ -73,6 +73,21 @@
       <button type="button" id="btnTypeIn" onclick="setTxType('entrada')">💰 Entrada</button>
     </div>
 
+    <div class="scan-card" id="scanCard">
+      <button type="button" class="scan-main-btn" onclick="abrirCameraComprovante()">📷 Escanear comprovante da maquininha</button>
+      <input type="file" id="fComprovante" accept="image/*" capture="environment" style="display:none" onchange="if(this.files[0]) processarComprovante(this.files[0]); this.value='';">
+      <canvas id="receiptCanvas" style="display:none"></canvas>
+      <div class="scan-preview" id="scanPreview" style="display:none;">
+        <img id="receiptImg" alt="Comprovante capturado">
+        <div class="scan-meta">
+          <div class="scan-title">Leitura do comprovante</div>
+          <div id="scanStatus">Aguardando imagem…</div>
+          <div class="scan-progress"><div id="scanProgressBar"></div></div>
+        </div>
+      </div>
+      <div class="scan-result" id="scanResult" style="display:none;"></div>
+    </div>
+
     <label>Data</label>
     <input type="date" id="fData">
 
@@ -172,6 +187,7 @@
 
 <div id="printReport"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
 <script src="js/app.js" defer></script>
 </body>
 </html>

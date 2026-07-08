@@ -261,6 +261,7 @@ function openModal(){
   document.getElementById('fData').value = new Date().toISOString().slice(0,10);
   document.getElementById('fValor').value = '';
   document.getElementById('fDescricao').value = '';
+  resetScannerUI();
   document.querySelectorAll('#quickChips .chip').forEach(c=>c.classList.remove('active'));
   setTxType('gasto');
   document.querySelector('.modal h3').textContent = 'Novo lançamento';
@@ -624,6 +625,203 @@ function renderOrcamento(d){
   return `<div class="section-title">Planejamento por categoria<span class="rule"></span></div>
     <div class="cat-list">${rows}</div>
     <div class="info-note">Ajuste os limites conforme o combinado do mês. As mudanças são salvas automaticamente e valem para todos os meses.</div>`;
+}
+
+
+// ===== Scanner de comprovantes por câmera/OCR =====
+// Funciona melhor em HTTPS ou localhost. No celular, o input abre a câmera traseira.
+
+function resetScannerUI(){
+  const preview = document.getElementById('scanPreview');
+  const result = document.getElementById('scanResult');
+  const img = document.getElementById('receiptImg');
+  const bar = document.getElementById('scanProgressBar');
+  const st = document.getElementById('scanStatus');
+  if(preview) preview.style.display = 'none';
+  if(result){ result.style.display = 'none'; result.innerHTML = ''; }
+  if(img) img.removeAttribute('src');
+  if(bar) bar.style.width = '0%';
+  if(st) st.textContent = 'Aguardando imagem…';
+}
+
+function abrirCameraComprovante(){
+  const input = document.getElementById('fComprovante');
+  if(!input){ showToast('Scanner indisponível neste navegador.'); return; }
+  if(location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1'){
+    showToast('Para abrir câmera no celular, publique o app em HTTPS.');
+  }
+  input.click();
+}
+
+function setScanProgress(texto, pct){
+  const st = document.getElementById('scanStatus');
+  const bar = document.getElementById('scanProgressBar');
+  if(st) st.textContent = texto;
+  if(bar) bar.style.width = Math.max(0, Math.min(100, pct||0)) + '%';
+}
+
+function normalizarTextoOCR(texto){
+  return String(texto||'')
+    .replace(/[|]/g,'I')
+    .replace(/[”“]/g,'"')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
+function parseValorBR(str){
+  if(!str) return null;
+  let s = String(str).replace(/[^0-9,\.]/g,'');
+  if(!s) return null;
+  const lastComma = s.lastIndexOf(',');
+  const lastDot = s.lastIndexOf('.');
+  const dec = Math.max(lastComma,lastDot);
+  if(dec >= 0){
+    const int = s.slice(0,dec).replace(/[^0-9]/g,'');
+    const cents = s.slice(dec+1).replace(/[^0-9]/g,'').slice(0,2).padEnd(2,'0');
+    return Number(int + '.' + cents);
+  }
+  return Number(s);
+}
+
+function extrairValorComprovante(texto){
+  const t = texto.toUpperCase();
+  const candidates = [];
+  const patterns = [
+    /(VALOR\s*(TOTAL)?|TOTAL\s*(R\$)?|COMPRA|PAGAMENTO|DEBITO|D[EÉ]BITO|CR[EÉ]DITO)[^0-9R$]{0,18}(R\$\s*)?([0-9]{1,3}(?:[\.\s][0-9]{3})*[,\.][0-9]{2}|[0-9]+[,\.][0-9]{2})/gi,
+    /(R\$\s*)([0-9]{1,3}(?:[\.\s][0-9]{3})*[,\.][0-9]{2}|[0-9]+[,\.][0-9]{2})/gi,
+    /\b([0-9]{1,3}(?:[\.\s][0-9]{3})*[,\.][0-9]{2}|[0-9]+[,\.][0-9]{2})\b/g
+  ];
+  patterns.forEach((re, idx)=>{
+    let m;
+    while((m = re.exec(t)) !== null){
+      const raw = m[m.length-1];
+      const valor = parseValorBR(raw);
+      if(valor && valor > 0 && valor < 100000){
+        let score = idx===0 ? 30 : idx===1 ? 20 : 10;
+        const before = t.slice(Math.max(0, m.index-40), m.index+80);
+        if(/TOTAL|VALOR|COMPRA|PAGAMENTO/.test(before)) score += 20;
+        if(/TROCO|SALDO|AUTORIZ|NSU|CNPJ|CPF|CUPOM/.test(before)) score -= 8;
+        candidates.push({valor, score, raw});
+      }
+    }
+  });
+  if(!candidates.length) return null;
+  candidates.sort((a,b)=> b.score-a.score || b.valor-a.valor);
+  return candidates[0].valor;
+}
+
+function extrairDataComprovante(texto){
+  const t = texto;
+  const re = /(\b\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/g;
+  let m;
+  while((m = re.exec(t)) !== null){
+    let dia = Number(m[1]), mes = Number(m[2]), ano = Number(m[3]);
+    if(ano < 100) ano += 2000;
+    if(dia>=1 && dia<=31 && mes>=1 && mes<=12 && ano>=2020 && ano<=2100){
+      return `${ano}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+    }
+  }
+  return new Date().toISOString().slice(0,10);
+}
+
+function extrairFormaComprovante(texto){
+  const t = texto.toUpperCase();
+  if(/PIX/.test(t)) return 'Pix';
+  if(/D[EÉ]BITO|DEBITO|DEB\b/.test(t)) return 'Débito';
+  if(/CR[EÉ]DITO|CREDITO|CRED\b|PARCEL/.test(t)) return 'Crédito';
+  if(/DINHEIRO|ESP[EÉ]CIE/.test(t)) return 'Dinheiro';
+  return 'Crédito';
+}
+
+function sugerirCategoriaDescricao(texto){
+  const up = texto.toUpperCase();
+  const regras = [
+    [/POSTO|COMBUST|GASOL|ETANOL|SHELL|IPIRANGA|RAIZEN|ALE|PETROBRAS/, 'Combustível', 'Posto / combustível'],
+    [/PEDAG|SEM PARAR|VELOE|CONECTCAR/, 'Pedágio', 'Pedágio'],
+    [/MERCADO|SUPERMERC|ATACAD|ASSAI|ATACAD[AÃ]O|CARREFOUR|EXTRA|DIA |PADARIA|HORTIFRUTI/, 'Alimentação', 'Supermercado / alimentação'],
+    [/IFOOD|RESTAUR|LANCH|PIZZ|BURGER|CAF[EÉ]|A[ÇC]AI/, 'Alimentação', 'Restaurante / alimentação'],
+    [/UBER|99|METRO|METR[ÔO]|ESTACION|PARKING|TAXI|T[ÁA]XI/, 'Transporte', 'Transporte'],
+    [/FARMAC|DROGA|DROGARIA|HOSPITAL|CLINIC|LABORAT|EXAME/, 'Saúde', 'Saúde'],
+    [/CINEMA|NETFLIX|SPOTIFY|AMAZON PRIME|INGRESSO|BAR /, 'Lazer', 'Lazer'],
+    [/ESCOLA|CURSO|FACUL|LIVRARIA|PAPELARIA/, 'Educação', 'Educação'],
+    [/ALUGUEL|CONDOM|ENERGIA|SABESP|ENEL|INTERNET|VIVO|CLARO|TIM/, 'Moradia', 'Moradia']
+  ];
+  for(const [re, cat, desc] of regras){ if(re.test(up)) return {categoria:cat, descricao:desc}; }
+  const linhas = String(texto||'').split(/\n+/).map(x=>x.trim()).filter(x=>x.length>3);
+  const loja = linhas.find(l=> !/CNPJ|CPF|VALOR|TOTAL|AUTORIZ|NSU|CUPOM|SAT|DATA|HORA/i.test(l));
+  return {categoria:'Outros', descricao: loja ? loja.slice(0,48) : 'Comprovante da maquininha'};
+}
+
+async function reduzirImagemParaOCR(file){
+  const img = document.getElementById('receiptImg');
+  const canvas = document.getElementById('receiptCanvas');
+  const url = URL.createObjectURL(file);
+  await new Promise((resolve, reject)=>{
+    img.onload = resolve; img.onerror = reject; img.src = url;
+  });
+  const maxW = 1400;
+  const scale = Math.min(1, maxW / img.naturalWidth);
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  URL.revokeObjectURL(url);
+  return canvas.toDataURL('image/jpeg', .92);
+}
+
+async function processarComprovante(file){
+  const preview = document.getElementById('scanPreview');
+  const result = document.getElementById('scanResult');
+  if(preview) preview.style.display = 'flex';
+  if(result){ result.style.display = 'block'; result.innerHTML = 'Preparando imagem…'; }
+  setTxType('gasto');
+  setScanProgress('Preparando imagem…', 8);
+  try{
+    const dataUrl = await reduzirImagemParaOCR(file);
+    if(typeof Tesseract === 'undefined'){
+      setScanProgress('OCR não carregou.', 0);
+      if(result) result.innerHTML = 'Não consegui carregar o leitor de texto. Verifique a internet e tente de novo.';
+      return;
+    }
+    setScanProgress('Lendo texto do comprovante…', 18);
+    const { data } = await Tesseract.recognize(dataUrl, 'por+eng', {
+      logger: m => {
+        if(m.status === 'recognizing text') setScanProgress('Lendo texto do comprovante…', 18 + Math.round((m.progress||0)*72));
+        else if(m.status) setScanProgress(m.status, 12);
+      }
+    });
+    const texto = normalizarTextoOCR(data.text || '');
+    const valor = extrairValorComprovante(texto);
+    const dataIso = extrairDataComprovante(data.text || texto);
+    const forma = extrairFormaComprovante(texto);
+    const sug = sugerirCategoriaDescricao(data.text || texto);
+
+    if(dataIso) document.getElementById('fData').value = dataIso;
+    if(valor) document.getElementById('fValor').value = valor.toFixed(2);
+    if(sug.categoria) document.getElementById('fCategoria').value = sug.categoria;
+    if(forma) document.getElementById('fForma').value = forma;
+    if(sug.descricao && !document.getElementById('fDescricao').value) document.getElementById('fDescricao').value = sug.descricao;
+    document.getElementById('fTipoGasto').value = 'Necessário';
+
+    setScanProgress('Leitura concluída. Confira antes de salvar.', 100);
+    const conf = Math.round(data.confidence || 0);
+    if(result){
+      result.innerHTML = `
+        <b>Preenchi o lançamento automaticamente.</b><br>
+        Valor: <b>${valor ? brl(valor) : 'não identificado'}</b> · Data: <b>${fmtData(dataIso)}</b> · Pagamento: <b>${esc(forma)}</b><br>
+        Categoria sugerida: <b>${esc(sug.categoria)}</b> · Descrição: <b>${esc(sug.descricao)}</b>
+        <div class="scan-confidence">Precisão OCR aproximada: ${conf}%</div>
+        <div class="scan-actions">
+          <button type="button" onclick="abrirCameraComprovante()">Tirar outra foto</button>
+          <button type="button" onclick="document.getElementById('scanResult').style.display='none'">Ok, conferir campos</button>
+        </div>`;
+    }
+    if(!valor) showToast('Não achei o valor. Preencha manualmente.');
+  }catch(err){
+    console.error(err);
+    setScanProgress('Falha na leitura.', 0);
+    if(result) result.innerHTML = 'Não consegui ler esse comprovante. Tente uma foto mais reta, com boa luz, ou preencha manualmente.';
+  }
 }
 
 (async function init(){

@@ -12,6 +12,7 @@ PWA de controle financeiro para casal/família, com uso em celular e computador,
 - Relatório mensal para impressão/PDF.
 - Instalação como aplicativo PWA em Android, iPhone e desktop.
 - Layout responsivo para celular, tablet e PC.
+- Scanner de comprovante pelo celular: abre a câmera, roda OCR com Tesseract.js e pré-preenche valor, data, forma de pagamento, categoria e descrição para conferência.
 
 ## Como rodar localmente
 
@@ -42,6 +43,16 @@ HTTPS é necessário para instalação PWA e Service Worker fora de `localhost`.
 4. Publique como **Web App** com acesso para “qualquer pessoa com o link”.
 5. Copie a URL terminada em `/exec`.
 6. No app, toque em ⚙️ e cole essa URL.
+
+## Scanner de comprovantes
+
+No botão **Escanear comprovante da maquininha**, o app usa a câmera do celular e a biblioteca Tesseract.js carregada via CDN. Por isso, para o OCR funcionar pela primeira vez, o aparelho precisa de internet. A captura de câmera exige HTTPS em hospedagem pública. Depois da leitura, o app apenas pré-preenche os campos: o usuário deve conferir e tocar em **Salvar lançamento**.
+
+Dicas para melhor leitura:
+
+- Tire a foto com boa iluminação.
+- Deixe o comprovante reto e ocupando boa parte da tela.
+- Confira valor e data antes de salvar, porque OCR pode errar números.
 
 ## Próximas melhorias profissionais recomendadas
 
