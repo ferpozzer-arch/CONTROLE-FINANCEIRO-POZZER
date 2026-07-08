@@ -24,6 +24,8 @@ function showToast(msg){
 
 function abrirMenuFerramentas(){ document.getElementById('toolsBg')?.classList.add('open'); }
 function fecharMenuFerramentas(){ document.getElementById('toolsBg')?.classList.remove('open'); }
+function abrirLancamentoInteligente(){ document.getElementById('smartBg')?.classList.add('open'); }
+function fecharLancamentoInteligente(){ document.getElementById('smartBg')?.classList.remove('open'); }
 function abrirScannerDireto(){
   const input = document.getElementById('quickComprovante');
   if(input) input.click();
@@ -269,6 +271,8 @@ function openModal(){
   document.getElementById('fData').value = new Date().toISOString().slice(0,10);
   document.getElementById('fValor').value = '';
   document.getElementById('fDescricao').value = '';
+  if(document.getElementById('fParcelas')) document.getElementById('fParcelas').value = '1';
+  if(document.getElementById('fRecorrencia')) document.getElementById('fRecorrencia').value = 'nao';
   resetScannerUI();
   document.querySelectorAll('#quickChips .chip').forEach(c=>c.classList.remove('active'));
   setTxType('gasto');
@@ -350,16 +354,31 @@ async function saveTransaction(){
 
   if(txType==='gasto'){
     gastos = await fetchLatest('gastos', gastos);
-    const novo = {
+    const base = {
       id: editingId || uid(), data, categoria:document.getElementById('fCategoria').value,
       descricao:document.getElementById('fDescricao').value, valor, pessoa,
       forma:document.getElementById('fForma').value, tipoGasto:document.getElementById('fTipoGasto').value
     };
+    const parcelas = Math.max(1, Number(document.getElementById('fParcelas')?.value || 1));
+    const recorrencia = document.getElementById('fRecorrencia')?.value || 'nao';
     if(editingKind==='gasto' && editingId){
       const idx = gastos.findIndex(x=>x.id===editingId);
-      if(idx>-1) gastos[idx] = novo; else gastos.push(novo);
+      if(idx>-1) gastos[idx] = base; else gastos.push(base);
+    } else if(parcelas > 1){
+      const grupo = uid();
+      const valorParcela = Math.round((valor/parcelas)*100)/100;
+      for(let i=0;i<parcelas;i++){
+        const dt = new Date(data+'T00:00:00'); dt.setMonth(dt.getMonth()+i);
+        gastos.push({...base, id:uid(), valor:valorParcela, data:dt.toISOString().slice(0,10), descricao:(base.descricao||base.categoria) + ` (${i+1}/${parcelas})`, parcelaAtual:i+1, parcelas, grupoParcelamento:grupo});
+      }
+    } else if(recorrencia === 'mensal'){
+      const grupo = uid();
+      for(let i=0;i<12;i++){
+        const dt = new Date(data+'T00:00:00'); dt.setMonth(dt.getMonth()+i);
+        gastos.push({...base, id:uid(), data:dt.toISOString().slice(0,10), descricao:(base.descricao||base.categoria) + ` (recorrente)`, recorrente:true, grupoRecorrencia:grupo});
+      }
     } else {
-      gastos.push(novo);
+      gastos.push(base);
     }
     await persist('gastos', gastos);
   } else {
@@ -398,6 +417,8 @@ function openEditModal(kind, id){
   document.getElementById('fValor').value = item.valor || '';
   document.getElementById('fPessoa').value = item.pessoa || 'FERNANDO';
   document.getElementById('fDescricao').value = item.descricao || '';
+  if(document.getElementById('fParcelas')) document.getElementById('fParcelas').value = '1';
+  if(document.getElementById('fRecorrencia')) document.getElementById('fRecorrencia').value = 'nao';
   document.querySelectorAll('#quickChips .chip').forEach(c=>c.classList.remove('active'));
   setTxType(kind);
 
@@ -578,13 +599,12 @@ function render(){
 function renderResumo(d){
   return `
     <div class="hero-actions">
-      <label class="hero-btn camera" for="quickComprovante"><span>📷</span><b>IA do comprovante</b><small>Abre a câmera e preenche o gasto automaticamente</small></label>
-      <button class="hero-btn" onclick="openModal()"><span>➕</span><b>Novo lançamento</b><small>Entrada ou gasto manual</small></button>
+      <button class="hero-btn camera single" onclick="abrirLancamentoInteligente()"><span>✨</span><b>Lançamento inteligente</b><small>Câmera, galeria, SMS ou digitação manual</small></button>
     </div>
     <div class="action-row compact">
-      <div class="action-btn" onclick="switchTab('graficos')">📊 Gráficos</div>
+      <div class="action-btn" onclick="switchTab('graficos')">📊 Relatórios</div>
       <div class="action-btn primary" onclick="gerarRelatorio()">📄 PDF do mês</div>
-      <div class="action-btn" onclick="exportarBackup()">💾 Backup</div>
+      <div class="action-btn" onclick="abrirMenuFerramentas()">☰ Mais</div>
     </div>
     <div class="grid2">
       <div class="card in"><div class="k">Entradas</div><div class="v">${brl(d.totalEnt)}</div></div>
@@ -793,7 +813,7 @@ function capturarComprovanteRapido(input){
 }
 
 function abrirCameraComprovante(){
-  const input = document.getElementById('fComprovante');
+  const input = document.getElementById('smartCamera') || document.getElementById('quickComprovante');
   if(!input){ showToast('Scanner indisponível neste navegador.'); return; }
   if(location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1'){
     showToast('Para abrir câmera no celular, publique o app em HTTPS.');

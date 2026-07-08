@@ -526,3 +526,17 @@ body:has(.modal-bg.open) .quick-scan-wrap{display:none;}
   padding:13px 14px;
   font-family:'IBM Plex Sans',sans-serif;
 }
+
+/* Versão Pro 3.0: fluxo único de lançamento inteligente */
+.hero-btn.single{min-height:92px;justify-content:flex-start;border-radius:22px;}
+.hero-btn.single b{font-size:19px;letter-spacing:.02em;text-transform:uppercase;}
+.hero-btn.single span{font-size:36px;}
+.smart-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+.smart-option{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:18px;padding:16px 12px;min-height:118px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:8px;text-align:left;font-family:'IBM Plex Sans',sans-serif;box-shadow:var(--shadow);cursor:pointer;width:100%;}
+.smart-option span{font-size:32px;line-height:1;}
+.smart-option b{font-size:15px;line-height:1.1;}
+.smart-option small{font-size:11.5px;line-height:1.3;color:var(--ink-soft);opacity:.78;}
+.smart-option.camera{background:linear-gradient(135deg,var(--ink),#254c3f);color:var(--paper);border-color:rgba(228,200,120,.5);}
+.smart-option.camera small{color:var(--paper);opacity:.78;}
+.pro-fields{margin-top:10px;}
+@media (min-width:900px){.smart-modal{max-width:560px}.smart-grid{grid-template-columns:repeat(4,1fr)}.smart-option{min-height:138px}.hero-btn.single{min-height:110px}}

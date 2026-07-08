@@ -59,11 +59,13 @@
 <main id="mainContent"></main>
 
 <input type="file" id="quickComprovante" accept="image/*" capture="environment" class="scan-file-input" onchange="capturarComprovanteRapido(this)">
+<canvas id="receiptCanvas" style="display:none"></canvas>
+<img id="receiptImg" alt="Comprovante" style="display:none">
 
 <nav class="bottom">
   <button class="navbtn active" data-tab="resumo" onclick="switchTab('resumo')"><span class="ic">🏠</span>Início</button>
   <button class="navbtn" data-tab="historico" onclick="switchTab('historico')"><span class="ic">📜</span>Histórico</button>
-  <button class="navbtn fab-btn" onclick="openModal()" title="Novo lançamento"><span class="ic">+</span></button>
+  <button class="navbtn fab-btn" onclick="abrirLancamentoInteligente()" title="Lançamento inteligente"><span class="ic">+</span></button>
   <button class="navbtn" data-tab="graficos" onclick="switchTab('graficos')"><span class="ic">📊</span>Gráficos</button>
   <button class="navbtn" data-tab="orcamento" onclick="switchTab('orcamento')"><span class="ic">🎯</span>Orçamento</button>
 </nav>
@@ -77,20 +79,14 @@
       <button type="button" id="btnTypeIn" onclick="setTxType('entrada')">💰 Entrada</button>
     </div>
 
-    <div class="scan-card" id="scanCard">
-      <label class="scan-main-btn" for="fComprovante"><span class="scan-icon">📷</span><span>Escanear comprovante da maquininha</span></label>
-      <input type="file" id="fComprovante" accept="image/*" capture="environment" class="scan-file-input" onchange="if(this.files[0]) processarComprovante(this.files[0]); this.value='';">
-      <canvas id="receiptCanvas" style="display:none"></canvas>
-      <div class="scan-preview" id="scanPreview" style="display:none;">
-        <img id="receiptImg" alt="Comprovante capturado">
-        <div class="scan-meta">
-          <div class="scan-title">Leitura do comprovante</div>
-          <div id="scanStatus">Aguardando imagem…</div>
-          <div class="scan-progress"><div id="scanProgressBar"></div></div>
-        </div>
+    <div class="scan-preview" id="scanPreview" style="display:none; margin-bottom:12px;">
+      <div class="scan-meta" style="width:100%;">
+        <div class="scan-title">Leitura inteligente</div>
+        <div id="scanStatus">Aguardando imagem…</div>
+        <div class="scan-progress"><div id="scanProgressBar"></div></div>
       </div>
-      <div class="scan-result" id="scanResult" style="display:none;"></div>
     </div>
+    <div class="scan-result" id="scanResult" style="display:none;"></div>
 
     <label>Data</label>
     <input type="date" id="fData">
@@ -133,6 +129,20 @@
           </select>
         </div>
       </div>
+      <div class="row2 pro-fields">
+        <div>
+          <label>Parcelas</label>
+          <select id="fParcelas">
+            <option value="1">À vista</option><option value="2">2x</option><option value="3">3x</option><option value="4">4x</option><option value="5">5x</option><option value="6">6x</option><option value="10">10x</option><option value="12">12x</option>
+          </select>
+        </div>
+        <div>
+          <label>Recorrência</label>
+          <select id="fRecorrencia">
+            <option value="nao">Não repetir</option><option value="mensal">Todo mês</option>
+          </select>
+        </div>
+      </div>
     </div>
 
     <div id="entradaFields" style="display:none;">
@@ -156,13 +166,12 @@
     <button class="close-x" onclick="fecharMenuFerramentas()">✕</button>
     <h3>Ferramentas</h3>
     <div class="tool-grid">
-      <label class="tool-card camera" for="toolComprovante"><span>📷</span><b>Escanear comprovante</b><small>Abre a câmera e preenche valor, data e categoria.</small></label>
+      <button class="tool-card camera" onclick="fecharMenuFerramentas(); abrirLancamentoInteligente()"><span>✨</span><b>Lançamento inteligente</b><small>Foto, imagem, SMS ou digitação em um único lugar.</small></button>
       <button class="tool-card" onclick="fecharMenuFerramentas(); abrirImportadorSMS()"><span>💬</span><b>Importar SMS</b><small>Cole a mensagem do cartão e o app preenche o gasto.</small></button>
       <button class="tool-card" onclick="fecharMenuFerramentas(); switchTab('graficos')"><span>📊</span><b>Gráficos</b><small>Pizza, evolução e comparação por pessoa.</small></button>
       <button class="tool-card" onclick="fecharMenuFerramentas(); gerarRelatorio()"><span>📄</span><b>PDF do mês</b><small>Relatório pronto para imprimir ou salvar.</small></button>
       <button class="tool-card" onclick="fecharMenuFerramentas(); exportarBackup()"><span>💾</span><b>Backup</b><small>Baixa todos os dados em arquivo JSON.</small></button>
     </div>
-    <input type="file" id="toolComprovante" accept="image/*" capture="environment" class="scan-file-input" onchange="capturarComprovanteRapido(this); fecharMenuFerramentas();">
   </div>
 </div>
 
@@ -180,6 +189,22 @@
       <button class="secondary-btn" type="button" onclick="fecharImportadorSMS()">Cancelar</button>
       <button class="save-btn" type="button" onclick="processarSMSManual()">Preencher lançamento</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="smartBg" onclick="if(event.target===this)fecharLancamentoInteligente()">
+  <div class="modal smart-modal">
+    <button class="close-x" onclick="fecharLancamentoInteligente()">✕</button>
+    <h3>Lançamento inteligente</h3>
+    <div class="info-note" style="margin-top:0; text-align:left;">Escolha o jeito mais rápido. A IA local preenche o lançamento e você confirma antes de salvar.</div>
+    <div class="smart-grid">
+      <label class="smart-option camera" for="smartCamera"><span>📷</span><b>Tirar foto</b><small>Usa a câmera do celular</small></label>
+      <label class="smart-option" for="smartGallery"><span>🖼️</span><b>Galeria</b><small>Escolher imagem salva</small></label>
+      <button class="smart-option" onclick="fecharLancamentoInteligente(); abrirImportadorSMS()"><span>💬</span><b>Importar SMS</b><small>Copiar e colar mensagem do cartão</small></button>
+      <button class="smart-option" onclick="fecharLancamentoInteligente(); openModal()"><span>✍️</span><b>Digitar manual</b><small>Entrada ou gasto comum</small></button>
+    </div>
+    <input type="file" id="smartCamera" accept="image/*" capture="environment" class="scan-file-input" onchange="capturarComprovanteRapido(this); fecharLancamentoInteligente();">
+    <input type="file" id="smartGallery" accept="image/*" class="scan-file-input" onchange="capturarComprovanteRapido(this); fecharLancamentoInteligente();">
   </div>
 </div>
 
