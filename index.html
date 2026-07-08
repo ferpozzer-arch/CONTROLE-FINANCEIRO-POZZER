@@ -57,6 +57,11 @@
 
 <main id="mainContent"></main>
 
+<div class="quick-scan-wrap" aria-label="Escanear comprovante">
+  <input type="file" id="quickComprovante" accept="image/*" capture="environment" class="scan-file-input" onchange="capturarComprovanteRapido(this)">
+  <label class="quick-scan-floating" for="quickComprovante"><span>📷</span> Escanear comprovante</label>
+</div>
+
 <nav class="bottom">
   <button class="navbtn active" data-tab="resumo" onclick="switchTab('resumo')"><span class="ic">🏠</span>Início</button>
   <button class="navbtn" data-tab="historico" onclick="switchTab('historico')"><span class="ic">📜</span>Histórico</button>
@@ -74,8 +79,8 @@
     </div>
 
     <div class="scan-card" id="scanCard">
-      <button type="button" class="scan-main-btn" onclick="abrirCameraComprovante()">📷 Escanear comprovante da maquininha</button>
-      <input type="file" id="fComprovante" accept="image/*" capture="environment" style="display:none" onchange="if(this.files[0]) processarComprovante(this.files[0]); this.value='';">
+      <label class="scan-main-btn" for="fComprovante"><span class="scan-icon">📷</span><span>Escanear comprovante da maquininha</span></label>
+      <input type="file" id="fComprovante" accept="image/*" capture="environment" class="scan-file-input" onchange="if(this.files[0]) processarComprovante(this.files[0]); this.value='';">
       <canvas id="receiptCanvas" style="display:none"></canvas>
       <div class="scan-preview" id="scanPreview" style="display:none;">
         <img id="receiptImg" alt="Comprovante capturado">

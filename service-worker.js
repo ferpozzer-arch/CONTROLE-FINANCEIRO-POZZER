@@ -3,7 +3,7 @@
 // (ícone próprio, tela cheia, sem barra do navegador), e (2) deixar a tela do app abrindo mesmo
 // sem internet (os dados em si dependem da conexão para sincronizar, mas a tela sempre abre).
 
-const CACHE_VERSION = 'controle-financeiro-v2-scanner';
+const CACHE_VERSION = 'controle-financeiro-v3-scanner-botao-camera';
 const APP_SHELL = [
   './',
   './index.html',

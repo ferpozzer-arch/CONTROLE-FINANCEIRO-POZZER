@@ -644,6 +644,17 @@ function resetScannerUI(){
   if(st) st.textContent = 'Aguardando imagem…';
 }
 
+
+function capturarComprovanteRapido(input){
+  const file = input && input.files && input.files[0];
+  if(!file) return;
+  openModal();
+  setTimeout(() => {
+    processarComprovante(file);
+    input.value = '';
+  }, 80);
+}
+
 function abrirCameraComprovante(){
   const input = document.getElementById('fComprovante');
   if(!input){ showToast('Scanner indisponível neste navegador.'); return; }
