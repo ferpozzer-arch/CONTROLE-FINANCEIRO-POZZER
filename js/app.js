@@ -11,6 +11,11 @@ let viewDate = new Date();
 
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function brl(n){ n = Number(n)||0; return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
+
+function esc(v){
+  return String(v ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+}
+
 function showToast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
@@ -389,16 +394,16 @@ function gerarRelatorio(){
   const geradoEm = new Date().toLocaleString('pt-BR');
 
   const entRows = d.entMes.slice().sort((a,b)=>(a.data||'').localeCompare(b.data||''))
-    .map(e=>`<tr><td>${fmtData(e.data)}</td><td>${e.tipo||''}</td><td>${PERSON_LABEL[e.pessoa]||e.pessoa}</td><td>${e.descricao||'—'}</td><td style="text-align:right">${brl(e.valor)}</td></tr>`).join('');
+    .map(e=>`<tr><td>${fmtData(e.data)}</td><td>${esc(e.tipo||'')}</td><td>${esc(PERSON_LABEL[e.pessoa]||e.pessoa)}</td><td>${esc(e.descricao||'—')}</td><td style="text-align:right">${brl(e.valor)}</td></tr>`).join('');
 
   const gasRows = d.gasMes.slice().sort((a,b)=>(a.data||'').localeCompare(b.data||''))
-    .map(g=>`<tr><td>${fmtData(g.data)}</td><td>${g.categoria||''}</td><td>${PERSON_LABEL[g.pessoa]||g.pessoa}</td><td>${g.forma||''}</td><td>${g.tipoGasto||''}</td><td>${g.descricao||'—'}</td><td style="text-align:right">${brl(g.valor)}</td></tr>`).join('');
+    .map(g=>`<tr><td>${fmtData(g.data)}</td><td>${esc(g.categoria||'')}</td><td>${esc(PERSON_LABEL[g.pessoa]||g.pessoa)}</td><td>${esc(g.forma||'')}</td><td>${esc(g.tipoGasto||'')}</td><td>${esc(g.descricao||'—')}</td><td style="text-align:right">${brl(g.valor)}</td></tr>`).join('');
 
   const orc = orcamento || {};
   const catRows = CATEGORIAS.map(c=>{
     const lim = Number(orc[c]||0), gasto = d.porCategoria[c]||0, diff = lim-gasto;
     if(lim===0 && gasto===0) return '';
-    return `<tr><td>${c}</td><td style="text-align:right">${lim>0?brl(lim):'—'}</td><td style="text-align:right">${brl(gasto)}</td><td style="text-align:right; color:${diff<0?'#A83A2E':'#2F6B4F'}">${lim>0?brl(diff):'—'}</td></tr>`;
+    return `<tr><td>${esc(c)}</td><td style="text-align:right">${lim>0?brl(lim):'—'}</td><td style="text-align:right">${brl(gasto)}</td><td style="text-align:right; color:${diff<0?'#A83A2E':'#2F6B4F'}">${lim>0?brl(diff):'—'}</td></tr>`;
   }).join('');
 
   document.getElementById('printReport').innerHTML = `
@@ -554,7 +559,7 @@ function renderResumo(d){
         const pct = lim>0 ? Math.min(100,(gasto/lim)*100) : (gasto>0?100:0);
         const over = lim>0 && gasto>lim;
         return `<div class="cat-item">
-          <div class="cat-top"><span class="name">${c}</span><span class="nums">${brl(gasto)}${lim>0? ' / '+brl(lim):''}</span></div>
+          <div class="cat-top"><span class="name">${esc(c)}</span><span class="nums">${brl(gasto)}${lim>0? ' / '+brl(lim):''}</span></div>
           <div class="bar-track"><div class="bar-fill ${over?'over':''}" style="width:${pct}%"></div></div>
         </div>`;
       }).join('') : `<div class="empty-state"><div class="big">🗒️</div>Nenhum gasto registrado neste mês.</div>`}
@@ -578,7 +583,7 @@ function renderHistorico(d){
     const sub = [dataFmt, PERSON_LABEL[i.pessoa]||i.pessoa, !isIn ? i.forma : null, i.descricao||null].filter(Boolean).join(' · ');
     return `<div class="tx-item" onclick="openEditModal('${i.kind}','${i.id}')">
       <div class="tx-icon ${isIn?'in':'out'}">${isIn?'💰':'💸'}</div>
-      <div class="tx-mid"><div class="l1">${titulo}</div><div class="l2">${sub}</div></div>
+      <div class="tx-mid"><div class="l1">${esc(titulo)}</div><div class="l2">${esc(sub)}</div></div>
       <div class="tx-val ${isIn?'in':'out'}">${isIn?'+':'-'} ${brl(i.valor)}</div>
       <button class="tx-del" onclick="event.stopPropagation(); deleteTx('${i.kind}','${i.id}')">✕</button>
     </div>`;
@@ -609,11 +614,11 @@ function renderOrcamento(d){
     const pct = lim>0 ? Math.min(100,(gasto/lim)*100) : (gasto>0?100:0);
     const over = lim>0 && gasto>lim;
     return `<div class="cat-item">
-      <div class="cat-top"><span class="name">${c}</span><span class="nums">${brl(gasto)} gasto</span></div>
+      <div class="cat-top"><span class="name">${esc(c)}</span><span class="nums">${brl(gasto)} gasto</span></div>
       <div class="bar-track"><div class="bar-fill ${over?'over':''}" style="width:${pct}%"></div></div>
       <div class="cat-diff ${diff>=0?'pos':'neg'}">${diff>=0? 'Sobra '+brl(diff) : 'Estourou '+brl(Math.abs(diff))}</div>
       <label style="margin-top:10px;">Limite mensal</label>
-      <input type="number" id="lim_${c}" value="${lim}" step="10" inputmode="decimal">
+      <input type="number" id="lim_${esc(c)}" value="${lim}" step="10" inputmode="decimal">
     </div>`;
   }).join('');
   return `<div class="section-title">Planejamento por categoria<span class="rule"></span></div>
