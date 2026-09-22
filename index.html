@@ -11,9 +11,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="CONTROLE FINANCEIRO">
 <meta name="theme-color" content="#0B251E">
-<link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<link rel="apple-touch-icon" href="icons/icon-v10-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-v10-192.png">
+<link rel="shortcut icon" href="icons/favicon-v10.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-v10-512.png">
 <link rel="manifest" href="manifest.webmanifest">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,7 +28,7 @@
 <header class="top">
   <div class="top-row">
     <div class="brand">
-      <div class="stamp premium-stamp"><img src="icons/icon-192.png" alt=""></div>
+      <div class="stamp premium-stamp"><img src="icons/icon-v10-192.png" alt=""></div>
       <div class="brand-text">
         <div class="title">CONTROLE FINANCEIRO</div>
         <div class="subtitle">Fernando & Vanessa</div>
@@ -40,8 +41,8 @@
         <button onclick="changeMonth(1)">›</button>
       </div>
       <div class="header-actions">
-        <button class="refresh-btn" id="refreshBtn" onclick="refreshData()" title="Atualizar dados"><span class="ic">🔄</span></button>
-        <button class="refresh-btn" onclick="openSettings()" title="Configurar sincronização"><span class="ic">⚙️</span></button>
+        <button class="refresh-btn" id="refreshBtn" onclick="refreshData()" title="Atualizar dados"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M18.5 9A7 7 0 1 0 19 15"/></svg></span></button>
+        <button class="refresh-btn" onclick="openSettings()" title="Configurar sincronização"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21h-4v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H3v-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6V3h4v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1v4H21a1.7 1.7 0 0 0-1.6 1z"/></svg></span></button>
       </div>
     </div>
   </div>
@@ -62,11 +63,11 @@
 <img id="receiptImg" alt="Comprovante" style="display:none">
 
 <nav class="bottom">
-  <button class="navbtn active" data-tab="resumo" onclick="switchTab('resumo')"><span class="ic">🏠</span>Início</button>
-  <button class="navbtn" data-tab="historico" onclick="switchTab('historico')"><span class="ic">📜</span>Histórico</button>
+  <button class="navbtn active" data-tab="resumo" onclick="switchTab('resumo')"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/><path d="M9.5 20v-6h5v6"/></svg></span>Início</button>
+  <button class="navbtn" data-tab="historico" onclick="switchTab('historico')"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/><circle cx="18" cy="18" r="2"/></svg></span>Histórico</button>
   <button class="navbtn fab-btn" onclick="abrirLancamentoInteligente()" title="Lançamento inteligente"><span class="ic">+</span></button>
-  <button class="navbtn" data-tab="faturas" onclick="switchTab('faturas')"><span class="ic">📂</span>Documentos</button>
-  <button class="navbtn" data-tab="orcamento" onclick="switchTab('orcamento')"><span class="ic">🎯</span>Planejar</button>
+  <button class="navbtn" data-tab="faturas" onclick="switchTab('faturas')"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h6l2 2h8v12H4z"/><path d="M4 9h16"/></svg></span>Documentos</button>
+  <button class="navbtn" data-tab="orcamento" onclick="switchTab('orcamento')"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="M12 4V2M20 12h2"/></svg></span>Planejar</button>
 </nav>
 
 <div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
@@ -228,9 +229,9 @@
 
     <div class="settings-actions">
       <button class="secondary-btn" type="button" onclick="gerarRelatorio()">📄 Relatório mensal</button>
-      <button class="secondary-btn" type="button" onclick="forceAppUpdate()">↻ Atualizar aplicativo</button>
+      
     </div>
-    <div class="app-version">Versão <b>9.0.0</b> · Premium Recovery + Documentos</div>
+    <div class="app-version">Versão <b>10.0.0</b> · Premium Finance</div>
 
     <div style="border-top:1px solid var(--line); padding-top:14px; margin-top:14px;">
       <label style="margin-top:0;">Backup dos dados</label>
@@ -245,7 +246,7 @@
 </div>
 
 <div id="splash">
-  <div class="splash-icon"><img src="icons/icon-192.png" alt="" style="width:72px;height:72px;border-radius:22px;box-shadow:0 14px 36px rgba(0,0,0,.24)"></div>
+  <div class="splash-icon"><img src="icons/icon-v10-192.png" alt="" style="width:72px;height:72px;border-radius:22px;box-shadow:0 14px 36px rgba(0,0,0,.24)"></div>
   <div class="splash-title">CONTROLE FINANCEIRO</div>
 </div>
 

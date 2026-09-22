@@ -1354,10 +1354,34 @@ async function processarComprovante(file){
   setTimeout(()=>checarNotificacoes(false),800);
 })();
 
-// Registra o service worker (permite instalar como app de verdade e abrir offline).
-// Só funciona quando o site está em https:// (não funciona abrindo o arquivo direto no computador).
+// Registra o service worker e verifica automaticamente se há uma versão nova publicada.
+// A atualização do app é independente da sincronização financeira e não altera dados/regras de negócio.
 if('serviceWorker' in navigator){
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('service-worker.js').catch(()=>{ /* sem suporte, segue normal */ });
+  let appReloadingForUpdate = false;
+  const hadControllerAtStartup = !!navigator.serviceWorker.controller;
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    // Quando uma nova versão assume o controle, recarrega uma única vez para exibi-la.
+    if(!hadControllerAtStartup || appReloadingForUpdate) return;
+    appReloadingForUpdate = true;
+    location.reload();
+  });
+
+  window.addEventListener('load', async () => {
+    try{
+      const reg = await navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' });
+      await reg.update();
+
+      // Verifica novamente ao voltar para o app e periodicamente enquanto estiver aberto.
+      const checkForAppUpdate = () => reg.update().catch(()=>{});
+      document.addEventListener('visibilitychange', () => {
+        if(document.visibilityState === 'visible') checkForAppUpdate();
+      });
+      window.addEventListener('focus', checkForAppUpdate);
+      window.addEventListener('pageshow', checkForAppUpdate);
+      setInterval(checkForAppUpdate, 15 * 60 * 1000);
+    }catch(e){
+      // Sem suporte/offline: o aplicativo continua funcionando normalmente com o cache existente.
+    }
   });
 }

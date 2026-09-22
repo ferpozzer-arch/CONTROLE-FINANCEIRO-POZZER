@@ -1194,3 +1194,12 @@ nav.bottom button.active .ic{color:var(--premium-gold-2)!important;}
   main{padding-bottom:30px!important;}
   nav.bottom{position:relative;left:auto;right:auto;bottom:auto;margin:10px 14px 14px!important;width:calc(100% - 28px)!important;}
 }
+
+/* v10.1 · iconografia e acabamento final */
+.ic svg{width:1em;height:1em;display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.refresh-btn .ic{font-size:18px;display:flex;align-items:center;justify-content:center}
+.navbtn .ic{display:flex;align-items:center;justify-content:center;width:22px;height:22px}
+.navbtn .ic svg{width:21px;height:21px;stroke-width:1.9}
+nav.bottom button.active .ic svg{filter:drop-shadow(0 2px 5px rgba(230,203,135,.18))}
+.settings-actions>:only-child{grid-column:1/-1}
+.settings-actions .secondary-btn{width:100%}
