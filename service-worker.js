@@ -3,7 +3,7 @@
 // (ícone próprio, tela cheia, sem barra do navegador), e (2) deixar a tela do app abrindo mesmo
 // sem internet (os dados em si dependem da conexão para sincronizar, mas a tela sempre abre).
 
-const CACHE_VERSION = 'controle-financeiro-v8-smart-pro';
+const CACHE_VERSION = 'controle-financeiro-v5-20260922';
 const APP_SHELL = [
   './',
   './index.html',
@@ -36,17 +36,14 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const network = fetch(event.request)
-        .then((response) => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    fetch(event.request).then((response) => {
+      if (response && response.ok) {
+        const copy = response.clone();
+        caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, copy));
+      }
+      return response;
+    }).catch(() => caches.match(event.request))
   );
 });
+
+self.addEventListener('notificationclick', event => { event.notification.close(); event.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(ws=>ws[0]?ws[0].focus():clients.openWindow('./'))); });

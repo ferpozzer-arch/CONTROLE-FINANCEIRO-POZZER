@@ -41,7 +41,6 @@
       </div>
       <div class="header-actions">
         <button class="refresh-btn" id="refreshBtn" onclick="refreshData()" title="Atualizar dados"><span class="ic">🔄</span></button>
-        <button class="refresh-btn" onclick="abrirMenuFerramentas()" title="Ferramentas"><span class="ic">☰</span></button>
         <button class="refresh-btn" onclick="openSettings()" title="Configurar sincronização"><span class="ic">⚙️</span></button>
       </div>
     </div>
@@ -66,8 +65,8 @@
   <button class="navbtn active" data-tab="resumo" onclick="switchTab('resumo')"><span class="ic">🏠</span>Início</button>
   <button class="navbtn" data-tab="historico" onclick="switchTab('historico')"><span class="ic">📜</span>Histórico</button>
   <button class="navbtn fab-btn" onclick="abrirLancamentoInteligente()" title="Lançamento inteligente"><span class="ic">+</span></button>
-  <button class="navbtn" data-tab="graficos" onclick="switchTab('graficos')"><span class="ic">📊</span>Gráficos</button>
-  <button class="navbtn" data-tab="orcamento" onclick="switchTab('orcamento')"><span class="ic">🎯</span>Orçamento</button>
+  <button class="navbtn" data-tab="faturas" onclick="switchTab('faturas')"><span class="ic">💳</span>Faturas</button>
+  <button class="navbtn" data-tab="orcamento" onclick="switchTab('orcamento')"><span class="ic">🎯</span>Planejar</button>
 </nav>
 
 <div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
@@ -211,7 +210,7 @@
 <div class="modal-bg" id="settingsBg" onclick="if(event.target===this)closeSettings()">
   <div class="modal">
     <button class="close-x" onclick="closeSettings()">✕</button>
-    <h3>Sincronização entre os celulares</h3>
+    <h3>Configurações</h3>
     <div class="info-note" style="margin-top:0; text-align:left;">
       Cole aqui o link do "Web App" do Google Apps Script conectado à planilha de vocês. Faça isso em cada aparelho (seu celular, o da Vanessa e o notebook) usando a mesma URL.
     </div>
@@ -226,6 +225,12 @@
       <b>Como conferir se está sincronizando de verdade:</b><br>
       Repare no textinho embaixo do saldo, no topo do app ("• X lançamentos no total"). Lance algo em um celular, atualize (🔄) no outro, e veja se o número de lançamentos fica igual nos dois. Bolinha verde = conectado à planilha compartilhada. Bolinha vermelha = salvando só neste aparelho.
     </div>
+
+    <div class="settings-actions">
+      <button class="secondary-btn" type="button" onclick="gerarRelatorio()">📄 Relatório mensal</button>
+      <button class="secondary-btn" type="button" onclick="forceAppUpdate()">↻ Atualizar aplicativo</button>
+    </div>
+    <div class="app-version">Versão <b>5.0.0</b> · Faturas & Contas</div>
 
     <div style="border-top:1px solid var(--line); padding-top:14px; margin-top:14px;">
       <label style="margin-top:0;">Backup dos dados</label>
@@ -248,6 +253,8 @@
 
 <div id="printReport"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs" type="module"></script>
+<script>window.PDFJS_CDN="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";</script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
 <script src="js/app.js" defer></script>
 </body>

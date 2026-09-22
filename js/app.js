@@ -4,6 +4,8 @@ const PERSON_LABEL = {FERNANDO:"Fernando", VANESSA:"Vanessa"};
 let entradas = [];
 let gastos = [];
 let orcamento = {};
+let faturas = [];
+let contas = [];
 let currentTab = 'resumo';
 let txType = 'gasto';
 let historicoFilter = 'todos';
@@ -36,6 +38,8 @@ async function loadAll(){
   entradas = await storageGet('entradas');
   gastos = await storageGet('gastos');
   orcamento = await storageGet('orcamento');
+  faturas = await storageGet('faturas');
+  contas = await storageGet('contas');
 
   if(entradas===null){
     entradas = [
@@ -53,6 +57,8 @@ async function loadAll(){
     ];
     await storageSet('gastos', gastos);
   }
+  if(faturas===null){ faturas=[]; await storageSet('faturas', faturas); }
+  if(contas===null){ contas=[]; await storageSet('contas', contas); }
   if(orcamento===null){
     orcamento = {Moradia:1500, "Alimentação":800, Transporte:600, "Saúde":300, Lazer:400, "Educação":200, Outros:300, Combustível:0, "Pedágio":0, Reserva:0};
     await storageSet('orcamento', orcamento);
@@ -210,7 +216,7 @@ function updateSyncLabel(){
 
   const countEl = document.getElementById('syncCount');
   if(countEl){
-    const total = (Array.isArray(entradas)?entradas.length:0) + (Array.isArray(gastos)?gastos.length:0);
+    const total = (Array.isArray(entradas)?entradas.length:0) + (Array.isArray(gastos)?gastos.length:0) + (Array.isArray(faturas)?faturas.length:0) + (Array.isArray(contas)?contas.length:0);
     countEl.textContent = '· ' + total + ' lançamentos no total';
   }
 }
@@ -236,6 +242,8 @@ async function refreshData(silent){
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') refreshData(true); });
 window.addEventListener('focus', ()=>refreshData(true));
 window.addEventListener('pageshow', ()=>refreshData(true));
+window.addEventListener('online', ()=>refreshData(true));
+setInterval(()=>{ if(document.visibilityState==='visible') refreshData(true); }, 30000);
 
 function monthKey(d){ return d.toISOString().slice(0,7); }
 function inCurrentMonth(dateStr){ return (dateStr||'').slice(0,7) === monthKey(viewDate); }
@@ -451,7 +459,7 @@ async function deleteTx(kind, id){
 
 // ===== Backup: exportar/importar todos os dados como arquivo JSON =====
 function exportarBackup(){
-  const payload = { entradas, gastos, orcamento, exportadoEm: new Date().toISOString() };
+  const payload = { entradas, gastos, orcamento, faturas, contas, exportadoEm: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -467,10 +475,12 @@ async function importarBackupArquivo(file){
     const text = await file.text();
     const data = JSON.parse(text);
     if(!data.entradas || !data.gastos) throw new Error('Formato inválido');
-    entradas = data.entradas; gastos = data.gastos; orcamento = data.orcamento || orcamento;
+    entradas = data.entradas; gastos = data.gastos; orcamento = data.orcamento || orcamento; faturas = data.faturas || []; contas = data.contas || [];
     await persist('entradas', entradas);
     await persist('gastos', gastos);
     await persist('orcamento', orcamento);
+    await persist('faturas', faturas);
+    await persist('contas', contas);
     showToast('Backup restaurado com sucesso!');
     render();
   }catch(err){
@@ -580,7 +590,7 @@ function render(){
   const main = document.getElementById('mainContent');
   if(currentTab==='resumo') main.innerHTML = renderResumo(d);
   else if(currentTab==='historico') main.innerHTML = renderHistorico(d);
-  else if(currentTab==='graficos') main.innerHTML = renderGraficos(d);
+  else if(currentTab==='faturas') main.innerHTML = renderFaturasContas(d);
   else main.innerHTML = renderOrcamento(d);
 
   if(currentTab==='orcamento'){
@@ -597,72 +607,41 @@ function render(){
 }
 
 function renderResumo(d){
+  const alertas = getAlertasVencimento(7);
+  const insight = gerarInsightsInteligentes(d)[0];
   return `
-    <div class="hero-actions">
-      <button class="hero-btn camera single" onclick="abrirLancamentoInteligente()"><span>✨</span><b>Lançamento inteligente</b><small>Câmera, galeria, SMS ou digitação manual</small></button>
-    </div>
-    <div class="action-row compact">
-      <div class="action-btn" onclick="switchTab('graficos')">📊 Relatórios</div>
-      <div class="action-btn primary" onclick="gerarRelatorio()">📄 PDF do mês</div>
-      <div class="action-btn" onclick="abrirMenuFerramentas()">☰ Mais</div>
-    </div>
-    <div class="grid2">
-      <div class="card in"><div class="k">Entradas</div><div class="v">${brl(d.totalEnt)}</div></div>
-      <div class="card out"><div class="k">Gastos</div><div class="v">${brl(d.totalGas)}</div></div>
-    </div>
+    <section class="modern-hero">
+      <div class="eyebrow">Visão do mês</div>
+      <div class="hero-money ${d.saldo<0?'negative':''}">${brl(d.saldo)}</div>
+      <div class="hero-sub">${d.saldo>=0?'saldo disponível após os gastos':'saldo negativo — atenção ao fechamento'}</div>
+      <div class="hero-metrics">
+        <div><span>Receitas</span><b>${brl(d.totalEnt)}</b></div>
+        <div><span>Despesas</span><b>${brl(d.totalGas)}</b></div>
+        <div><span>Poupança</span><b>${d.taxaPoupanca.toFixed(0)}%</b></div>
+      </div>
+    </section>
 
-    <div class="section-title">Por pessoa<span class="rule"></span></div>
+    ${alertas.length ? `<section class="alert-panel"><div class="panel-head"><div><span class="eyebrow">Próximos vencimentos</span><h3>Não deixem passar</h3></div><span class="alert-badge">${alertas.length}</span></div>${alertas.slice(0,4).map(a=>`<div class="due-row"><div class="due-icon">${a.tipo==='fatura'?'💳':'🧾'}</div><div class="due-main"><b>${esc(a.nome)}</b><span>${a.dias===0?'vence hoje':a.dias===1?'vence amanhã':`vence em ${a.dias} dias`} · ${fmtData(a.data)}</span></div><strong>${brl(a.valor)}</strong></div>`).join('')}</section>` : ''}
+
+    <section class="ai-panel">
+      <div class="ai-icon">✦</div><div><span class="eyebrow">Assistente financeiro</span><p>${esc(insight)}</p></div>
+    </section>
+
+    <div class="section-title">Gastos por pessoa<span class="rule"></span></div>
     <div class="person-row">
-      <div class="person-card fernando">
-        <div class="avatar fernando">F</div>
-        <div><div class="name">Fernando gastou</div><div class="amt">${brl(d.porPessoaGasto.FERNANDO||0)}</div></div>
-      </div>
-      <div class="person-card vanessa">
-        <div class="avatar vanessa">V</div>
-        <div><div class="name">Vanessa gastou</div><div class="amt">${brl(d.porPessoaGasto.VANESSA||0)}</div></div>
-      </div>
+      <div class="person-card fernando"><div class="avatar fernando">F</div><div><div class="name">Fernando</div><div class="amt">${brl(d.porPessoaGasto.FERNANDO||0)}</div></div></div>
+      <div class="person-card vanessa"><div class="avatar vanessa">V</div><div><div class="name">Vanessa</div><div class="amt">${brl(d.porPessoaGasto.VANESSA||0)}</div></div></div>
     </div>
 
-    <div class="section-title">Saúde financeira do mês<span class="rule"></span></div>
-    <div class="cat-item">
-      <div class="cat-top"><span class="name">Taxa de poupança</span><span class="nums">${d.taxaPoupanca.toFixed(0)}% da renda</span></div>
-      <div class="bar-track"><div class="bar-fill ${d.taxaPoupanca<0?'over':''}" style="width:${Math.max(0,Math.min(100,d.taxaPoupanca))}%"></div></div>
-      <div class="cat-diff ${d.taxaPoupanca>=20?'pos':'neg'}">${
-        d.taxaPoupanca>=20
-          ? 'Ótimo: acima da meta clássica de guardar 20% da renda.'
-          : d.taxaPoupanca>=0
-            ? 'Abaixo dos 20% recomendados como referência de poupança — dá pra apertar um pouco.'
-            : 'Vocês gastaram mais do que entrou neste mês. Vale revisar os gastos supérfluos abaixo.'
-      }</div>
-    </div>
-    ${d.totalGas>0 ? `
-    <div class="cat-item" style="margin-top:10px;">
-      <div class="cat-top"><span class="name">Essencial vs. supérfluo</span><span class="nums">${brl(d.necessario)} · ${brl(d.superfluo)}</span></div>
-      <div class="bar-track"><div class="bar-fill" style="width:${(d.necessario/d.totalGas)*100}%; background:var(--good);"></div></div>
-      <div class="cat-diff pos">${((d.superfluo/d.totalGas)*100).toFixed(0)}% dos gastos foram supérfluos${(d.superfluo/d.totalGas)>0.3 ? ' — bem acima da referência de ~30% (regra 50/30/20)' : ''}</div>
-    </div>` : ''}
-    ${d.limiteTotal>0 ? `
-    <div class="cat-item" style="margin-top:10px;">
-      <div class="cat-top"><span class="name">Orçamento combinado</span><span class="nums">${brl(d.totalGas)} / ${brl(d.limiteTotal)}</span></div>
-      <div class="bar-track"><div class="bar-fill ${d.totalGas>d.limiteTotal?'over':''}" style="width:${Math.min(100,(d.totalGas/d.limiteTotal)*100)}%"></div></div>
-    </div>` : ''}
-
-    <div class="section-title">Gastos por categoria<span class="rule"></span></div>
+    <div class="section-title">Categorias do mês<span class="rule"></span></div>
     <div class="cat-list">
-      ${CATEGORIAS.filter(c=>d.porCategoria[c]>0).length ? CATEGORIAS.filter(c=>d.porCategoria[c]>0).map(c=>{
-        const gasto = d.porCategoria[c]||0;
-        const lim = orcamento[c]||0;
-        const pct = lim>0 ? Math.min(100,(gasto/lim)*100) : (gasto>0?100:0);
-        const over = lim>0 && gasto>lim;
-        return `<div class="cat-item">
-          <div class="cat-top"><span class="name">${esc(c)}</span><span class="nums">${brl(gasto)}${lim>0? ' / '+brl(lim):''}</span></div>
-          <div class="bar-track"><div class="bar-fill ${over?'over':''}" style="width:${pct}%"></div></div>
-        </div>`;
-      }).join('') : `<div class="empty-state"><div class="big">🗒️</div>Nenhum gasto registrado neste mês.</div>`}
-    </div>
-  `;
+      ${CATEGORIAS.filter(c=>d.porCategoria[c]>0).slice(0,5).map(c=>{
+        const gasto=d.porCategoria[c]||0, lim=Number(orcamento[c]||0);
+        const pct=lim>0?Math.min(100,(gasto/lim)*100):0;
+        return `<div class="cat-item"><div class="cat-top"><span class="name">${esc(c)}</span><span class="nums">${brl(gasto)}</span></div>${lim>0?`<div class="bar-track"><div class="bar-fill ${gasto>lim?'over':''}" style="width:${pct}%"></div></div>`:''}</div>`;
+      }).join('') || `<div class="empty-state compact-empty">Ainda não há gastos neste mês.</div>`}
+    </div>`;
 }
-
 function gerarInsights(d){
   const msgs = [];
   const topCat = Object.entries(d.porCategoria).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1])[0];
@@ -748,9 +727,6 @@ function renderHistorico(d){
   }).join('');
 
   return `
-    <div class="action-row">
-      <div class="action-btn primary" onclick="gerarRelatorio()">📄 Relatório PDF do mês</div>
-    </div>
     <div class="filter-row">
       <div class="chip ${historicoFilter==='todos'?'active':''}" onclick="setHistFilter('todos')">Todos</div>
       <div class="chip ${historicoFilter==='entradas'?'active':''}" onclick="setHistFilter('entradas')">Entradas</div>
@@ -763,6 +739,156 @@ function renderHistorico(d){
   `;
 }
 function setHistFilter(f){ historicoFilter=f; render(); }
+
+
+function isoHoje(){ return new Date().toISOString().slice(0,10); }
+function diasAte(iso){
+  if(!iso) return 9999;
+  const hoje=new Date(); hoje.setHours(0,0,0,0);
+  const alvo=new Date(iso+'T00:00:00');
+  return Math.ceil((alvo-hoje)/86400000);
+}
+function getAlertasVencimento(janela=7){
+  const lista=[];
+  (Array.isArray(faturas)?faturas:[]).forEach(f=>{
+    const dias=diasAte(f.vencimento);
+    if(dias>=0 && dias<=janela && !f.paga) lista.push({tipo:'fatura',nome:f.cartao||'Fatura do cartão',valor:Number(f.valor||0),data:f.vencimento,dias,id:f.id});
+  });
+  (Array.isArray(contas)?contas:[]).forEach(c=>{
+    const prox=proximoVencimentoConta(c);
+    const dias=diasAte(prox);
+    if(dias>=0 && dias<=janela) lista.push({tipo:'conta',nome:c.nome||'Conta',valor:Number(c.valor||0),data:prox,dias,id:c.id});
+  });
+  return lista.sort((a,b)=>a.dias-b.dias || b.valor-a.valor);
+}
+function proximoVencimentoConta(c){
+  const hoje=new Date();
+  const dia=Math.max(1,Math.min(31,Number(c.dia)||1));
+  let d=new Date(hoje.getFullYear(),hoje.getMonth(),dia);
+  if(d < new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate())) d=new Date(hoje.getFullYear(),hoje.getMonth()+1,dia);
+  return d.toISOString().slice(0,10);
+}
+function gerarInsightsInteligentes(d){
+  const msgs=[];
+  const serie=faturaSeries(6);
+  const atual=serie.length?serie[serie.length-1].total:0;
+  const ant=serie.length>1?serie[serie.length-2].total:0;
+  if(atual>0 && ant>0){
+    const dif=((atual-ant)/ant)*100;
+    msgs.push(dif>5?`As faturas somadas subiram ${Math.abs(dif).toFixed(0)}% em relação ao mês anterior.`:dif<-5?`As faturas somadas caíram ${Math.abs(dif).toFixed(0)}% em relação ao mês anterior.`:`As faturas estão praticamente estáveis em relação ao mês anterior.`);
+  }
+  if(d.saldo<0) msgs.push('O saldo do mês está negativo. Vale reduzir gastos não essenciais antes dos próximos vencimentos.');
+  else if(d.totalEnt>0 && d.taxaPoupanca<10) msgs.push('O saldo está positivo, mas a margem de segurança está baixa. Uma reserva de pelo menos 10% da renda deixaria o mês mais confortável.');
+  else if(d.totalEnt>0) msgs.push(`Vocês estão com ${brl(d.saldo)} de saldo no mês e ${d.taxaPoupanca.toFixed(0)}% da renda preservada.`);
+  const alertas=getAlertasVencimento(7);
+  if(alertas.length) msgs.push(`${alertas.length} conta${alertas.length>1?'s':''} vence${alertas.length===1?'':'m'} nos próximos 7 dias, somando ${brl(alertas.reduce((s,a)=>s+a.valor,0))}.`);
+  if(!msgs.length) msgs.push('Cadastre receitas, despesas e faturas para eu conseguir apontar tendências e vencimentos importantes.');
+  return msgs;
+}
+function faturaSeries(n=8){
+  const out=[];
+  for(let i=n-1;i>=0;i--){
+    const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-i);
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const label=d.toLocaleDateString('pt-BR',{month:'short',year:'2-digit'}).replace('.','');
+    const total=(Array.isArray(faturas)?faturas:[]).filter(f=>(f.competencia||f.vencimento||'').slice(0,7)===key).reduce((s,f)=>s+Number(f.valor||0),0);
+    out.push({key,label,total});
+  }
+  return out;
+}
+function renderFaturaChart(){
+  const serie=faturaSeries(8), max=Math.max(1,...serie.map(x=>x.total));
+  return `<div class="invoice-chart">${serie.map(x=>`<div class="inv-col"><div class="inv-value">${x.total?brl(x.total).replace('R$ ','R$'):''}</div><div class="inv-bar-wrap"><i style="height:${x.total?Math.max(5,(x.total/max)*100):2}%"></i></div><small>${esc(x.label)}</small></div>`).join('')}</div>`;
+}
+function renderFaturasContas(d){
+  const fs=(Array.isArray(faturas)?faturas:[]).slice().sort((a,b)=>(b.vencimento||'').localeCompare(a.vencimento||''));
+  const cs=(Array.isArray(contas)?contas:[]).slice().sort((a,b)=>Number(a.dia||0)-Number(b.dia||0));
+  const totalAtual=faturaSeries(1)[0]?.total||0;
+  const alertas=getAlertasVencimento(7);
+  return `
+    <section class="invoice-hero">
+      <div><span class="eyebrow">Cartões neste mês</span><h2>${brl(totalAtual)}</h2><p>Soma de todas as faturas cadastradas.</p></div>
+      <label class="upload-pdf-btn" for="invoicePdf">＋ Adicionar PDF</label>
+      <input id="invoicePdf" type="file" accept="application/pdf" style="display:none" onchange="importarFaturaPDF(this)">
+    </section>
+    <section class="chart-panel"><div class="panel-head"><div><span class="eyebrow">Evolução</span><h3>Faturas somadas por mês</h3></div></div>${renderFaturaChart()}</section>
+    <section class="ai-panel"><div class="ai-icon">✦</div><div><span class="eyebrow">Análise automática</span>${gerarInsightsInteligentes(d).map(m=>`<p>${esc(m)}</p>`).join('')}</div></section>
+    ${alertas.length?`<section class="alert-panel"><div class="panel-head"><div><span class="eyebrow">Alerta</span><h3>Vencem em até 7 dias</h3></div></div>${alertas.map(a=>`<div class="due-row"><div class="due-icon">${a.tipo==='fatura'?'💳':'🧾'}</div><div class="due-main"><b>${esc(a.nome)}</b><span>${fmtData(a.data)}</span></div><strong>${brl(a.valor)}</strong></div>`).join('')}</section>`:''}
+    <div class="section-title">Faturas cadastradas<span class="rule"></span></div>
+    <div class="invoice-list">${fs.length?fs.map(f=>`<div class="invoice-card"><div class="invoice-card-top"><div><b>${esc(f.cartao||'Cartão')}</b><span>${esc(f.competencia||'')} · vence ${fmtData(f.vencimento)}</span></div><strong>${brl(f.valor)}</strong></div><div class="invoice-actions"><button onclick="toggleFaturaPaga('${f.id}')">${f.paga?'✓ Paga':'Marcar paga'}</button><button class="danger-link" onclick="excluirFatura('${f.id}')">Excluir</button></div></div>`).join(''):`<div class="empty-state"><div class="big">💳</div>Adicione o primeiro PDF de fatura.<br>O app tenta ler cartão, total e vencimento.</div>`}</div>
+    <div class="section-title">Contas recorrentes<span class="rule"></span></div>
+    <div class="account-add"><input id="contaNome" placeholder="Ex: Escola"><input id="contaValor" type="number" step="0.01" placeholder="Valor"><input id="contaDia" type="number" min="1" max="31" placeholder="Dia"><button onclick="adicionarConta()">Adicionar</button></div>
+    <div class="invoice-list">${cs.length?cs.map(c=>`<div class="invoice-card"><div class="invoice-card-top"><div><b>${esc(c.nome)}</b><span>todo dia ${Number(c.dia)} · próximo ${fmtData(proximoVencimentoConta(c))}</span></div><strong>${brl(c.valor)}</strong></div><div class="invoice-actions"><button class="danger-link" onclick="excluirConta('${c.id}')">Excluir</button></div></div>`).join(''):`<div class="info-note">Cadastre escola, condomínio, energia, internet ou qualquer conta mensal.</div>`}</div>
+    <button class="notification-btn" onclick="ativarAlertas()">🔔 Ativar alertas de vencimento</button>
+    <div class="info-note">Os alertas aparecem sempre que o app é aberto. Notificações do aparelho dependem da permissão do navegador e são verificadas quando o app está em uso.</div>`;
+}
+
+async function importarFaturaPDF(input){
+  const file=input?.files?.[0]; if(!file) return;
+  showToast('Lendo a fatura…');
+  try{
+    const pdfjsLib=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
+    pdfjsLib.GlobalWorkerOptions.workerSrc=window.PDFJS_CDN;
+    const bytes=new Uint8Array(await file.arrayBuffer());
+    const pdf=await pdfjsLib.getDocument({data:bytes}).promise;
+    let texto='';
+    for(let p=1;p<=Math.min(pdf.numPages,5);p++){
+      const page=await pdf.getPage(p); const tc=await page.getTextContent();
+      texto+=' '+tc.items.map(i=>i.str).join(' ');
+    }
+    const info=extrairDadosFatura(texto,file.name);
+    abrirConfirmacaoFatura(info,file.name);
+  }catch(err){ console.error(err); showToast('Não consegui ler esse PDF.'); }
+  input.value='';
+}
+function extrairDadosFatura(texto,nomeArquivo){
+  const t=String(texto||'').replace(/\s+/g,' '), up=t.toUpperCase();
+  const cartoes=['NUBANK','ITAÚ','ITAU','SANTANDER','BRADESCO','INTER','C6','XP','CAIXA','BANCO DO BRASIL','SICREDI','SICOOB'];
+  const cartao=cartoes.find(x=>up.includes(x)) || nomeArquivo.replace(/\.pdf$/i,'').slice(0,30) || 'Cartão';
+  let valor=null;
+  const valRes=[/(?:TOTAL\s+DA\s+FATURA|VALOR\s+TOTAL|TOTAL\s+A\s+PAGAR|PAGUE\s+AT[ÉE])[^R$0-9]{0,30}(?:R\$\s*)?([0-9\.]+,[0-9]{2})/i,/(?:R\$\s*)([0-9\.]+,[0-9]{2})/g];
+  for(const re of valRes){ const ms=[...t.matchAll(re)]; if(ms.length){ const vals=ms.map(m=>parseValorBR(m[1])).filter(v=>v>0&&v<1000000); if(vals.length){ valor=Math.max(...vals); break; } } }
+  let venc=null;
+  const vencRe=/(?:VENCIMENTO|VENCE\s+EM|DATA\s+DE\s+VENCIMENTO)[^0-9]{0,25}(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/i;
+  const mv=t.match(vencRe) || t.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](20\d{2})\b/);
+  if(mv){ let y=Number(mv[3]); if(y<100)y+=2000; venc=`${y}-${String(mv[2]).padStart(2,'0')}-${String(mv[1]).padStart(2,'0')}`; }
+  if(!venc){ const d=new Date(); venc=new Date(d.getFullYear(),d.getMonth()+1,10).toISOString().slice(0,10); }
+  const vd=new Date(venc+'T00:00:00'); vd.setMonth(vd.getMonth()-1);
+  const competencia=`${vd.getFullYear()}-${String(vd.getMonth()+1).padStart(2,'0')}`;
+  return {cartao,valor:valor||0,vencimento:venc,competencia};
+}
+function abrirConfirmacaoFatura(info,nomeArquivo){
+  const wrap=document.createElement('div'); wrap.className='modal-bg open'; wrap.id='invoiceConfirmBg';
+  wrap.innerHTML=`<div class="modal"><button class="close-x" onclick="document.getElementById('invoiceConfirmBg').remove()">✕</button><h3>Confirmar fatura</h3><div class="info-note" style="text-align:left;margin-top:0">Confira os dados que o leitor encontrou em <b>${esc(nomeArquivo)}</b>.</div><label>Cartão</label><input id="invCartao" value="${esc(info.cartao)}"><div class="row2"><div><label>Valor total</label><input id="invValor" type="number" step="0.01" value="${Number(info.valor||0).toFixed(2)}"></div><div><label>Vencimento</label><input id="invVenc" type="date" value="${esc(info.vencimento)}"></div></div><label>Competência</label><input id="invComp" type="month" value="${esc(info.competencia)}"><button class="save-btn" onclick="salvarFaturaConfirmada('${esc(nomeArquivo)}')">Salvar fatura</button></div>`;
+  document.getElementById('appShell').appendChild(wrap);
+}
+async function salvarFaturaConfirmada(nomeArquivo){
+  faturas=await fetchLatest('faturas',faturas||[]); if(!Array.isArray(faturas))faturas=[];
+  faturas.push({id:uid(),cartao:document.getElementById('invCartao').value.trim()||'Cartão',valor:Number(document.getElementById('invValor').value)||0,vencimento:document.getElementById('invVenc').value,competencia:document.getElementById('invComp').value,arquivo:nomeArquivo,paga:false,criadoEm:new Date().toISOString()});
+  await persist('faturas',faturas); document.getElementById('invoiceConfirmBg')?.remove(); render(); updateSyncLabel(); showToast('Fatura adicionada!'); checarNotificacoes();
+}
+async function toggleFaturaPaga(id){ faturas=await fetchLatest('faturas',faturas||[]); const f=faturas.find(x=>x.id===id); if(f)f.paga=!f.paga; await persist('faturas',faturas); render(); }
+async function excluirFatura(id){ if(!confirm('Excluir esta fatura?'))return; faturas=(await fetchLatest('faturas',faturas||[])).filter(x=>x.id!==id); await persist('faturas',faturas); render(); }
+async function adicionarConta(){
+  const nome=document.getElementById('contaNome').value.trim(), valor=Number(document.getElementById('contaValor').value)||0, dia=Number(document.getElementById('contaDia').value)||0;
+  if(!nome||dia<1||dia>31){showToast('Informe nome e dia de vencimento.');return;}
+  contas=await fetchLatest('contas',contas||[]); if(!Array.isArray(contas))contas=[]; contas.push({id:uid(),nome,valor,dia}); await persist('contas',contas); render(); showToast('Conta adicionada!');
+}
+async function excluirConta(id){ if(!confirm('Excluir esta conta?'))return; contas=(await fetchLatest('contas',contas||[])).filter(x=>x.id!==id); await persist('contas',contas); render(); }
+async function ativarAlertas(){
+  if(!('Notification' in window)){showToast('Este navegador não oferece notificações.');return;}
+  const p=await Notification.requestPermission(); showToast(p==='granted'?'Alertas ativados!':'Permissão de notificações não concedida.'); if(p==='granted')checarNotificacoes(true);
+}
+async function checarNotificacoes(forcar=false){
+  if(!('Notification' in window)||Notification.permission!=='granted')return;
+  const alertas=getAlertasVencimento(2); if(!alertas.length)return;
+  const chave='fin_last_notify_'+isoHoje(); if(!forcar&&localStorage.getItem(chave))return;
+  const body=alertas.slice(0,3).map(a=>`${a.nome}: ${brl(a.valor)} · ${a.dias===0?'hoje':a.dias===1?'amanhã':`em ${a.dias} dias`}`).join('\n');
+  try{ const reg=await navigator.serviceWorker?.ready; if(reg) await reg.showNotification('Contas próximas do vencimento',{body,icon:'icons/icon-192.png',tag:'finance-due'}); else new Notification('Contas próximas do vencimento',{body}); localStorage.setItem(chave,'1'); }catch(e){}
+}
+async function forceAppUpdate(){
+  try{ const regs=await navigator.serviceWorker.getRegistrations(); for(const r of regs) await r.update(); showToast('Atualização verificada. Reabrindo…'); setTimeout(()=>location.reload(true),600); }catch(e){ location.reload(true); }
+}
 
 function renderOrcamento(d){
   const rows = CATEGORIAS.map(c=>{
@@ -998,6 +1124,7 @@ async function processarComprovante(file){
   updateSyncLabel();
   const splash = document.getElementById('splash');
   if(splash) splash.classList.add('hide');
+  setTimeout(()=>checarNotificacoes(false),800);
 })();
 
 // Registra o service worker (permite instalar como app de verdade e abrir offline).
