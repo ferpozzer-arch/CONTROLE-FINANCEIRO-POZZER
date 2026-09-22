@@ -3,7 +3,7 @@
 // (ícone próprio, tela cheia, sem barra do navegador), e (2) deixar a tela do app abrindo mesmo
 // sem internet (os dados em si dependem da conexão para sincronizar, mas a tela sempre abre).
 
-const CACHE_VERSION = 'controle-financeiro-v5-20260922';
+const CACHE_VERSION = 'controle-financeiro-v7-premium-20260922';
 const APP_SHELL = [
   './',
   './index.html',

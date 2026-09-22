@@ -6,6 +6,7 @@ let gastos = [];
 let orcamento = {};
 let faturas = [];
 let contas = [];
+let dividas = [];
 let currentTab = 'resumo';
 let txType = 'gasto';
 let historicoFilter = 'todos';
@@ -40,6 +41,7 @@ async function loadAll(){
   orcamento = await storageGet('orcamento');
   faturas = await storageGet('faturas');
   contas = await storageGet('contas');
+  dividas = await storageGet('dividas');
 
   if(entradas===null){
     entradas = [
@@ -59,6 +61,7 @@ async function loadAll(){
   }
   if(faturas===null){ faturas=[]; await storageSet('faturas', faturas); }
   if(contas===null){ contas=[]; await storageSet('contas', contas); }
+  if(dividas===null){ dividas=[]; await storageSet('dividas', dividas); }
   if(orcamento===null){
     orcamento = {Moradia:1500, "Alimentação":800, Transporte:600, "Saúde":300, Lazer:400, "Educação":200, Outros:300, Combustível:0, "Pedágio":0, Reserva:0};
     await storageSet('orcamento', orcamento);
@@ -459,7 +462,7 @@ async function deleteTx(kind, id){
 
 // ===== Backup: exportar/importar todos os dados como arquivo JSON =====
 function exportarBackup(){
-  const payload = { entradas, gastos, orcamento, faturas, contas, exportadoEm: new Date().toISOString() };
+  const payload = { entradas, gastos, orcamento, faturas, contas, dividas, exportadoEm: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -475,12 +478,13 @@ async function importarBackupArquivo(file){
     const text = await file.text();
     const data = JSON.parse(text);
     if(!data.entradas || !data.gastos) throw new Error('Formato inválido');
-    entradas = data.entradas; gastos = data.gastos; orcamento = data.orcamento || orcamento; faturas = data.faturas || []; contas = data.contas || [];
+    entradas = data.entradas; gastos = data.gastos; orcamento = data.orcamento || orcamento; faturas = data.faturas || []; contas = data.contas || []; dividas = data.dividas || [];
     await persist('entradas', entradas);
     await persist('gastos', gastos);
     await persist('orcamento', orcamento);
     await persist('faturas', faturas);
     await persist('contas', contas);
+    await persist('dividas', dividas);
     showToast('Backup restaurado com sucesso!');
     render();
   }catch(err){
@@ -608,7 +612,8 @@ function render(){
 
 function renderResumo(d){
   const alertas = getAlertasVencimento(7);
-  const insight = gerarInsightsInteligentes(d)[0];
+  const plano = gerarPlanoDividas(d);
+  const insight = plano.resumo;
   return `
     <section class="modern-hero">
       <div class="eyebrow">Visão do mês</div>
@@ -624,7 +629,7 @@ function renderResumo(d){
     ${alertas.length ? `<section class="alert-panel"><div class="panel-head"><div><span class="eyebrow">Próximos vencimentos</span><h3>Não deixem passar</h3></div><span class="alert-badge">${alertas.length}</span></div>${alertas.slice(0,4).map(a=>`<div class="due-row"><div class="due-icon">${a.tipo==='fatura'?'💳':'🧾'}</div><div class="due-main"><b>${esc(a.nome)}</b><span>${a.dias===0?'vence hoje':a.dias===1?'vence amanhã':`vence em ${a.dias} dias`} · ${fmtData(a.data)}</span></div><strong>${brl(a.valor)}</strong></div>`).join('')}</section>` : ''}
 
     <section class="ai-panel">
-      <div class="ai-icon">✦</div><div><span class="eyebrow">Assistente financeiro</span><p>${esc(insight)}</p></div>
+      <div class="ai-icon">✦</div><div><span class="eyebrow">Assistente financeiro</span><p>${esc(insight)}</p><button class="ai-open-btn" onclick="switchTab('orcamento')">Ver plano de saída das dívidas →</button></div>
     </section>
 
     <div class="section-title">Gastos por pessoa<span class="rule"></span></div>
@@ -890,24 +895,75 @@ async function forceAppUpdate(){
   try{ const regs=await navigator.serviceWorker.getRegistrations(); for(const r of regs) await r.update(); showToast('Atualização verificada. Reabrindo…'); setTimeout(()=>location.reload(true),600); }catch(e){ location.reload(true); }
 }
 
+
+function totalDividas(){ return (dividas||[]).reduce((s,x)=>s+Number(x.saldo||0),0); }
+function totalMinimosDividas(){ return (dividas||[]).filter(x=>!x.quitada).reduce((s,x)=>s+Number(x.minimo||0),0); }
+function prioridadeDividas(){
+  return (dividas||[]).filter(x=>!x.quitada && Number(x.saldo||0)>0).slice().sort((a,b)=>{
+    const ja=Number(a.juros||0), jb=Number(b.juros||0);
+    if(jb!==ja) return jb-ja;
+    return Number(a.saldo||0)-Number(b.saldo||0);
+  });
+}
+function gerarPlanoDividas(d){
+  const ativas=prioridadeDividas();
+  const total=totalDividas();
+  const minimos=totalMinimosDividas();
+  const vencimentos=getAlertasVencimento(7).reduce((s,a)=>s+Number(a.valor||0),0);
+  const sobra=Math.max(0,Number(d.saldo||0));
+  if(!ativas.length){
+    return {resumo:sobra>0?`Não há dívidas cadastradas. Antes de aumentar o padrão de gastos, mantenham uma reserva para imprevistos e planejem a sobra de ${brl(sobra)}.`:'Cadastrem as dívidas para eu montar uma ordem de pagamento e um plano realista.', total, minimos, extra:0, alvo:null, passos:[]};
+  }
+  const alvo=ativas[0];
+  const reservaOperacional=Math.min(sobra, Math.max(0, Math.min(1000, d.totalEnt*0.05)));
+  const extra=Math.max(0, sobra-reservaOperacional);
+  let resumo='';
+  if(d.saldo<0) resumo=`O mês está negativo em ${brl(Math.abs(d.saldo))}. Agora a prioridade é parar de aumentar a dívida: contas essenciais, mínimos e corte temporário de supérfluos.`;
+  else if(extra<=0) resumo=`Há ${brl(total)} em dívidas cadastradas. A sobra atual é pequena; mantenham os pagamentos mínimos em dia e evitem novas compras parceladas enquanto ajustam o orçamento.`;
+  else resumo=`Depois de preservar ${brl(reservaOperacional)} para imprevistos do mês, há até ${brl(extra)} para acelerar a saída das dívidas. Pela taxa informada, a prioridade é ${alvo.nome}.`;
+  const passos=[];
+  passos.push(`Garanta primeiro moradia, alimentação, saúde, transporte e contas com vencimento próximo.`);
+  if(minimos>0) passos.push(`Separe ${brl(minimos)} para os pagamentos mínimos/parcelas das dívidas cadastradas.`);
+  if(extra>0) passos.push(`Direcione até ${brl(extra)} como pagamento extra para ${alvo.nome}, sem criar nova dívida para isso.`);
+  passos.push(`Quando ${alvo.nome} for quitada, transfira o valor que era pago nela para a próxima dívida da lista.`);
+  return {resumo,total,minimos,extra,alvo,passos,vencimentos,reservaOperacional};
+}
+
+async function adicionarDivida(){
+  const nome=document.getElementById('divNome')?.value.trim();
+  const saldo=Number(document.getElementById('divSaldo')?.value)||0;
+  const minimo=Number(document.getElementById('divMinimo')?.value)||0;
+  const juros=Number(document.getElementById('divJuros')?.value)||0;
+  const dia=Number(document.getElementById('divDia')?.value)||0;
+  if(!nome||saldo<=0){ showToast('Informe a dívida e o saldo devedor.'); return; }
+  dividas=await fetchLatest('dividas',dividas||[]); if(!Array.isArray(dividas))dividas=[];
+  dividas.push({id:uid(),nome,saldo,minimo,juros,dia,quitada:false,criadoEm:new Date().toISOString()});
+  await persist('dividas',dividas); render(); showToast('Dívida adicionada ao plano.');
+}
+async function excluirDivida(id){ if(!confirm('Excluir esta dívida do plano?'))return; dividas=(await fetchLatest('dividas',dividas||[])).filter(x=>x.id!==id); await persist('dividas',dividas); render(); }
+async function quitarDivida(id){ dividas=await fetchLatest('dividas',dividas||[]); const d=dividas.find(x=>x.id===id); if(d){d.quitada=!d.quitada;if(d.quitada)d.saldo=0;} await persist('dividas',dividas); render(); }
+async function atualizarSaldoDivida(id){
+  const el=document.getElementById('saldoDiv_'+id); const novo=Number(el?.value)||0;
+  dividas=await fetchLatest('dividas',dividas||[]); const d=dividas.find(x=>x.id===id); if(d){d.saldo=novo;d.quitada=novo<=0;} await persist('dividas',dividas); render(); showToast('Saldo atualizado.');
+}
+
 function renderOrcamento(d){
+  const plano=gerarPlanoDividas(d);
+  const ranking=prioridadeDividas();
   const rows = CATEGORIAS.map(c=>{
     const lim = orcamento[c]||0;
     const gasto = d.porCategoria[c]||0;
     const diff = lim - gasto;
     const pct = lim>0 ? Math.min(100,(gasto/lim)*100) : (gasto>0?100:0);
     const over = lim>0 && gasto>lim;
-    return `<div class="cat-item">
-      <div class="cat-top"><span class="name">${esc(c)}</span><span class="nums">${brl(gasto)} gasto</span></div>
-      <div class="bar-track"><div class="bar-fill ${over?'over':''}" style="width:${pct}%"></div></div>
-      <div class="cat-diff ${diff>=0?'pos':'neg'}">${diff>=0? 'Sobra '+brl(diff) : 'Estourou '+brl(Math.abs(diff))}</div>
-      <label style="margin-top:10px;">Limite mensal</label>
-      <input type="number" id="lim_${esc(c)}" value="${lim}" step="10" inputmode="decimal">
-    </div>`;
+    return `<div class="cat-item"><div class="cat-top"><span class="name">${esc(c)}</span><span class="nums">${brl(gasto)} gasto</span></div><div class="bar-track"><div class="bar-fill ${over?'over':''}" style="width:${pct}%"></div></div><div class="cat-diff ${diff>=0?'pos':'neg'}">${diff>=0? 'Sobra '+brl(diff) : 'Estourou '+brl(Math.abs(diff))}</div><label style="margin-top:10px;">Limite mensal</label><input type="number" id="lim_${esc(c)}" value="${lim}" step="10" inputmode="decimal"></div>`;
   }).join('');
-  return `<div class="section-title">Planejamento por categoria<span class="rule"></span></div>
-    <div class="cat-list">${rows}</div>
-    <div class="info-note">Ajuste os limites conforme o combinado do mês. As mudanças são salvas automaticamente e valem para todos os meses.</div>`;
+  return `<section class="debt-hero"><span class="eyebrow">Plano de recuperação</span><h2>${plano.total>0?brl(plano.total):'Cadastre suas dívidas'}</h2><p>${esc(plano.resumo)}</p><div class="debt-metrics"><div><span>Saldo devedor</span><b>${brl(plano.total)}</b></div><div><span>Mínimos / mês</span><b>${brl(plano.minimos)}</b></div><div><span>Extra possível</span><b>${brl(plano.extra)}</b></div></div></section>
+    ${plano.passos.length?`<section class="ai-plan"><div class="panel-head"><div><span class="eyebrow">Auxiliar financeiro</span><h3>O que fazer agora</h3></div></div>${plano.passos.map((x,i)=>`<div class="plan-step"><span>${i+1}</span><p>${esc(x)}</p></div>`).join('')}<div class="plan-note">O plano usa os dados informados no app. Juros, multas e propostas de renegociação podem alterar a melhor ordem de pagamento.</div></section>`:''}
+    <div class="section-title">Dívidas<span class="rule"></span></div>
+    <div class="debt-add"><input id="divNome" placeholder="Ex: Cartão Nubank"><input id="divSaldo" type="number" step="0.01" placeholder="Saldo devedor"><input id="divMinimo" type="number" step="0.01" placeholder="Parcela/mínimo"><input id="divJuros" type="number" step="0.01" placeholder="Juros % ao mês"><input id="divDia" type="number" min="1" max="31" placeholder="Dia venc."><button onclick="adicionarDivida()">Adicionar dívida</button></div>
+    <div class="debt-list">${ranking.length?ranking.map((x,i)=>`<div class="debt-card"><div class="debt-rank">${i+1}</div><div class="debt-main"><div class="debt-name">${esc(x.nome)}</div><div class="debt-meta">${Number(x.juros||0)>0?`${Number(x.juros).toFixed(2)}% a.m. · `:''}${Number(x.minimo||0)>0?`mínimo ${brl(x.minimo)} · `:''}${Number(x.dia||0)>0?`vence dia ${x.dia}`:'sem vencimento informado'}</div><div class="debt-edit"><input id="saldoDiv_${x.id}" type="number" step="0.01" value="${Number(x.saldo||0).toFixed(2)}"><button onclick="atualizarSaldoDivida('${x.id}')">Atualizar saldo</button></div></div><div class="debt-value"><b>${brl(x.saldo)}</b><button onclick="quitarDivida('${x.id}')">Quitar</button><button class="danger-link" onclick="excluirDivida('${x.id}')">Excluir</button></div></div>`).join(''):`<div class="empty-state compact-empty">Cadastre empréstimos, cartões parcelados, cheque especial ou outras dívidas. Informe a taxa de juros se souber; isso melhora a ordem de prioridade.</div>`}</div>
+    <div class="section-title">Limites do mês<span class="rule"></span></div><div class="cat-list">${rows}</div><div class="info-note">Enquanto houver dívida cara, o assistente prioriza contas essenciais, pagamentos mínimos e redução da dívida antes de sugerir aumentar gastos ou investir sobras.</div>`;
 }
 
 
