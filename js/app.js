@@ -618,40 +618,70 @@ function render(){
 function renderResumo(d){
   const alertas = getAlertasVencimento(7);
   const plano = gerarPlanoDividas(d);
-  const insight = plano.resumo;
+  const topCat = Object.entries(d.porCategoria).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1])[0];
+  const proximo = alertas[0];
+  const saldoClass = d.saldo < 0 ? 'negative' : 'positive';
+  const situacao = d.saldo < 0 ? 'Atenção necessária' : d.taxaPoupanca >= 10 ? 'Mês sob controle' : 'Margem apertada';
+  const situacaoIcon = d.saldo < 0 ? '!' : '✓';
   return `
-    <section class="modern-hero">
-      <div class="eyebrow">Visão do mês</div>
-      <div class="hero-money ${d.saldo<0?'negative':''}">${brl(d.saldo)}</div>
-      <div class="hero-sub">${d.saldo>=0?'saldo disponível após os gastos':'saldo negativo — atenção ao fechamento'}</div>
-      <div class="hero-metrics">
-        <div><span>Receitas</span><b>${brl(d.totalEnt)}</b></div>
-        <div><span>Despesas</span><b>${brl(d.totalGas)}</b></div>
-        <div><span>Poupança</span><b>${d.taxaPoupanca.toFixed(0)}%</b></div>
+    <section class="premium-dashboard ${saldoClass}">
+      <div class="dashboard-topline">
+        <div>
+          <span class="eyebrow">Situação do mês</span>
+          <div class="dashboard-status"><span class="status-orb">${situacaoIcon}</span>${situacao}</div>
+        </div>
+        <span class="dashboard-month">${viewDate.toLocaleDateString('pt-BR',{month:'short'}).replace('.','').toUpperCase()}</span>
+      </div>
+      <div class="dashboard-balance-label">Saldo projetado</div>
+      <div class="dashboard-balance">${brl(d.saldo)}</div>
+      <div class="dashboard-caption">${d.saldo>=0?'o que permanece após os gastos lançados':'as despesas lançadas superam as receitas do mês'}</div>
+      <div class="dashboard-stats">
+        <div><span>Entradas</span><strong>${brl(d.totalEnt)}</strong></div>
+        <div><span>Saídas</span><strong>${brl(d.totalGas)}</strong></div>
+        <div><span>Margem</span><strong>${d.totalEnt>0?d.taxaPoupanca.toFixed(0)+'%':'—'}</strong></div>
       </div>
     </section>
 
-    ${alertas.length ? `<section class="alert-panel"><div class="panel-head"><div><span class="eyebrow">Próximos vencimentos</span><h3>Não deixem passar</h3></div><span class="alert-badge">${alertas.length}</span></div>${alertas.slice(0,4).map(a=>`<div class="due-row"><div class="due-icon">${a.tipo==='fatura'?'💳':'🧾'}</div><div class="due-main"><b>${esc(a.nome)}</b><span>${a.dias===0?'vence hoje':a.dias===1?'vence amanhã':`vence em ${a.dias} dias`} · ${fmtData(a.data)}</span></div><strong>${brl(a.valor)}</strong></div>`).join('')}</section>` : ''}
-
-    <section class="ai-panel">
-      <div class="ai-icon">✦</div><div><span class="eyebrow">Assistente financeiro</span><p>${esc(insight)}</p><button class="ai-open-btn" onclick="switchTab('orcamento')">Ver plano de saída das dívidas →</button></div>
+    <section class="financial-guide-card">
+      <div class="guide-head">
+        <div class="guide-symbol">✦</div>
+        <div><span class="eyebrow">Auxiliar financeiro</span><h3>O que fazer agora</h3></div>
+      </div>
+      <p>${esc(plano.resumo)}</p>
+      <div class="guide-priority-grid">
+        <div><span>Saldo devedor</span><b>${brl(plano.total)}</b></div>
+        <div><span>Mínimos / mês</span><b>${brl(plano.minimos)}</b></div>
+        <div><span>Extra possível</span><b>${brl(plano.extra)}</b></div>
+      </div>
+      <button class="guide-link" onclick="switchTab('orcamento')">Abrir plano de recuperação <span>→</span></button>
     </section>
 
-    <div class="section-title">Gastos por pessoa<span class="rule"></span></div>
-    <div class="person-row">
+    ${alertas.length ? `<section class="due-premium-card">
+      <div class="panel-head"><div><span class="eyebrow">Agenda financeira</span><h3>Próximos vencimentos</h3></div><span class="alert-badge">${alertas.length}</span></div>
+      ${alertas.slice(0,3).map(a=>`<div class="due-row"><div class="due-icon">${a.tipo==='fatura'?'💳':a.tipo==='divida'?'⚠️':'🧾'}</div><div class="due-main"><b>${esc(a.nome)}</b><span>${a.dias===0?'vence hoje':a.dias===1?'vence amanhã':`vence em ${a.dias} dias`} · ${fmtData(a.data)}</span></div><strong>${brl(a.valor)}</strong></div>`).join('')}
+    </section>` : `<section class="quiet-card"><div class="quiet-icon">✓</div><div><b>Nenhum vencimento nos próximos 7 dias</b><span>Quando houver uma conta próxima, ela aparece aqui.</span></div></section>`}
+
+    <section class="snapshot-grid">
+      <div class="snapshot-card"><span>Maior categoria</span><b>${topCat?esc(topCat[0]):'Sem gastos'}</b><small>${topCat?brl(topCat[1]):'—'}</small></div>
+      <div class="snapshot-card"><span>Próximo compromisso</span><b>${proximo?esc(proximo.nome):'Nenhum'}</b><small>${proximo?`${proximo.dias===0?'Hoje':proximo.dias===1?'Amanhã':`Em ${proximo.dias} dias`} · ${brl(proximo.valor)}`:'próximos 7 dias'}</small></div>
+    </section>
+
+    <div class="section-title premium-section-title">Gastos por pessoa<span class="rule"></span></div>
+    <div class="person-row premium-person-row">
       <div class="person-card fernando"><div class="avatar fernando">F</div><div><div class="name">Fernando</div><div class="amt">${brl(d.porPessoaGasto.FERNANDO||0)}</div></div></div>
       <div class="person-card vanessa"><div class="avatar vanessa">V</div><div><div class="name">Vanessa</div><div class="amt">${brl(d.porPessoaGasto.VANESSA||0)}</div></div></div>
     </div>
 
-    <div class="section-title">Categorias do mês<span class="rule"></span></div>
-    <div class="cat-list">
-      ${CATEGORIAS.filter(c=>d.porCategoria[c]>0).slice(0,5).map(c=>{
+    <div class="section-title premium-section-title">Categorias do mês<span class="rule"></span></div>
+    <div class="cat-list premium-cat-list">
+      ${CATEGORIAS.filter(c=>d.porCategoria[c]>0).slice(0,4).map(c=>{
         const gasto=d.porCategoria[c]||0, lim=Number(orcamento[c]||0);
         const pct=lim>0?Math.min(100,(gasto/lim)*100):0;
-        return `<div class="cat-item"><div class="cat-top"><span class="name">${esc(c)}</span><span class="nums">${brl(gasto)}</span></div>${lim>0?`<div class="bar-track"><div class="bar-fill ${gasto>lim?'over':''}" style="width:${pct}%"></div></div>`:''}</div>`;
+        return `<div class="cat-item"><div class="cat-top"><span class="name">${esc(c)}</span><span class="nums">${brl(gasto)}</span></div>${lim>0?`<div class="bar-track"><div class="bar-fill ${gasto>lim?'over':''}" style="width:${pct}%"></div></div><div class="cat-helper">${gasto>lim?'Acima do limite':`${Math.max(0,100-pct).toFixed(0)}% do limite ainda disponível`}</div>`:''}</div>`;
       }).join('') || `<div class="empty-state compact-empty">Ainda não há gastos neste mês.</div>`}
     </div>`;
 }
+
 function gerarInsights(d){
   const msgs = [];
   const topCat = Object.entries(d.porCategoria).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1])[0];
@@ -822,12 +852,32 @@ function renderFaturasContas(d){
   const totalAtual=faturaSeries(1)[0]?.total||0;
   const alertas=getAlertasVencimento(7);
   return `
-    <section class="invoice-hero">
-      <div><span class="eyebrow">Cartões neste mês</span><h2>${brl(totalAtual)}</h2><p>Soma de todas as faturas cadastradas.</p></div>
-      <label class="upload-pdf-btn" for="invoiceFile">＋ Adicionar fatura</label>
+    <section class="docs-intro">
+      <span class="eyebrow">Central de documentos</span>
+      <h2>O que deseja adicionar?</h2>
+      <p>Envie PDF, imagem, captura de tela ou use a câmera. O app lê o documento e pede sua confirmação antes de salvar.</p>
+      <div class="docs-grid">
+        <div class="doc-action-card invoice-action">
+          <div class="doc-action-icon">💳</div>
+          <div class="doc-action-copy"><b>Fatura do cartão</b><span>Valor total, vencimento e competência</span></div>
+          <label class="doc-main-btn" for="invoiceFile">Adicionar fatura</label>
+          <button class="doc-camera-btn" onclick="document.getElementById('invoiceCamera').click()">📷 Câmera</button>
+        </div>
+        <div class="doc-action-card payroll-action">
+          <div class="doc-action-icon">💰</div>
+          <div class="doc-action-copy"><b>Holerite / salário</b><span>Valor líquido, competência e pessoa</span></div>
+          <label class="doc-main-btn" for="payrollFile">Adicionar holerite</label>
+          <button class="doc-camera-btn" onclick="document.getElementById('payrollCamera').click()">📷 Câmera</button>
+        </div>
+      </div>
       <input id="invoiceFile" type="file" accept="application/pdf,image/*" style="display:none" onchange="importarFaturaArquivo(this)">
       <input id="invoiceCamera" type="file" accept="image/*" capture="environment" style="display:none" onchange="importarFaturaArquivo(this)">
-      <button class="secondary-btn compact-action" onclick="document.getElementById('invoiceCamera').click()">📷 Fotografar / captura</button>
+      <input id="payrollFile" type="file" accept="application/pdf,image/*" style="display:none" onchange="importarHoleriteArquivo(this)">
+      <input id="payrollCamera" type="file" accept="image/*" capture="environment" style="display:none" onchange="importarHoleriteArquivo(this)">
+    </section>
+    <section class="invoice-hero invoice-summary">
+      <div><span class="eyebrow">Cartões neste mês</span><h2>${brl(totalAtual)}</h2><p>Soma de todas as faturas cadastradas.</p></div>
+      <div class="mini-stat"><span>Holerites</span><b>${hs.length}</b></div>
     </section>
     <section class="chart-panel"><div class="panel-head"><div><span class="eyebrow">Evolução</span><h3>Faturas somadas por mês</h3></div></div>${renderFaturaChart()}</section>
     <section class="ai-panel"><div class="ai-icon">✦</div><div><span class="eyebrow">Análise automática</span>${gerarInsightsInteligentes(d).map(m=>`<p>${esc(m)}</p>`).join('')}</div></section>
@@ -835,16 +885,7 @@ function renderFaturasContas(d){
     <div class="section-title">Faturas cadastradas<span class="rule"></span></div>
     <div class="invoice-list">${fs.length?fs.map(f=>`<div class="invoice-card"><div class="invoice-card-top"><div><b>${esc(f.cartao||'Cartão')}</b><span>${esc(f.competencia||'')} · vence ${fmtData(f.vencimento)} · ${esc(f.origem||'arquivo')}</span></div><strong>${brl(f.valor)}</strong></div><div class="invoice-actions"><button onclick="toggleFaturaPaga('${f.id}')">${f.paga?'✓ Paga':'Marcar paga'}</button><button class="danger-link" onclick="excluirFatura('${f.id}')">Excluir</button></div></div>`).join(''):`<div class="empty-state"><div class="big">💳</div>Adicione PDF, imagem ou captura de tela da fatura.<br>O app tenta identificar cartão, total e vencimento.</div>`}</div>
 
-    <div class="section-title">Holerites / receitas<span class="rule"></span></div>
-    <section class="document-panel">
-      <div><span class="eyebrow">Entrada inteligente</span><h3>Adicionar holerite</h3><p>Use PDF, imagem ou captura de tela. O app tenta localizar o valor líquido e a competência; você confirma antes de lançar como receita.</p></div>
-      <div class="document-actions">
-        <label class="upload-pdf-btn" for="payrollFile">＋ PDF ou imagem</label>
-        <input id="payrollFile" type="file" accept="application/pdf,image/*" style="display:none" onchange="importarHoleriteArquivo(this)">
-        <input id="payrollCamera" type="file" accept="image/*" capture="environment" style="display:none" onchange="importarHoleriteArquivo(this)">
-        <button class="secondary-btn" onclick="document.getElementById('payrollCamera').click()">📷 Fotografar</button>
-      </div>
-    </section>
+    <div class="section-title">Holerites cadastrados<span class="rule"></span></div>
     <div class="invoice-list">${hs.length?hs.map(h=>`<div class="invoice-card"><div class="invoice-card-top"><div><b>${esc(PERSON_LABEL[h.pessoa]||h.pessoa||'Holerite')}</b><span>${esc(h.competencia||'')} · ${h.lancado?'lançado nas receitas':'somente arquivado'}</span></div><strong>${brl(h.liquido)}</strong></div><div class="invoice-actions"><button class="danger-link" onclick="excluirHolerite('${h.id}')">Excluir</button></div></div>`).join(''):`<div class="info-note">Nenhum holerite importado ainda.</div>`}</div>
 
     <div class="section-title">Contas recorrentes<span class="rule"></span></div>
