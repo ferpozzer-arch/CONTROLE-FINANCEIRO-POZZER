@@ -22,3 +22,11 @@ A câmera do celular só abre de forma confiável quando o app está publicado e
 ## Observação importante sobre SMS automático
 
 No formato PWA/web, o app não consegue ler SMS sozinho. Para lançamento 100% automático a partir de SMS seria necessário criar um app Android nativo com permissão de SMS. Nesta versão, copie o SMS recebido e cole em **Lançamento inteligente > Importar SMS**.
+
+
+## v8.0.0
+- Faturas por PDF, imagem ou captura/foto.
+- Holerites por PDF, imagem ou captura/foto com leitura do valor líquido e lançamento opcional como receita.
+- Alertas reforçados de vencimento (7, 3, 2, 1 e 0 dias) ao abrir/usar o app.
+- Dívidas com vencimento também entram nos alertas.
+- Para push garantido com o app totalmente fechado, será necessário backend de notificações em etapa futura.

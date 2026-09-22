@@ -7,6 +7,7 @@ let orcamento = {};
 let faturas = [];
 let contas = [];
 let dividas = [];
+let holerites = [];
 let currentTab = 'resumo';
 let txType = 'gasto';
 let historicoFilter = 'todos';
@@ -42,6 +43,7 @@ async function loadAll(){
   faturas = await storageGet('faturas');
   contas = await storageGet('contas');
   dividas = await storageGet('dividas');
+  holerites = await storageGet('holerites');
 
   if(entradas===null){
     entradas = [
@@ -62,6 +64,7 @@ async function loadAll(){
   if(faturas===null){ faturas=[]; await storageSet('faturas', faturas); }
   if(contas===null){ contas=[]; await storageSet('contas', contas); }
   if(dividas===null){ dividas=[]; await storageSet('dividas', dividas); }
+  if(holerites===null){ holerites=[]; await storageSet('holerites', holerites); }
   if(orcamento===null){
     orcamento = {Moradia:1500, "Alimentação":800, Transporte:600, "Saúde":300, Lazer:400, "Educação":200, Outros:300, Combustível:0, "Pedágio":0, Reserva:0};
     await storageSet('orcamento', orcamento);
@@ -219,7 +222,7 @@ function updateSyncLabel(){
 
   const countEl = document.getElementById('syncCount');
   if(countEl){
-    const total = (Array.isArray(entradas)?entradas.length:0) + (Array.isArray(gastos)?gastos.length:0) + (Array.isArray(faturas)?faturas.length:0) + (Array.isArray(contas)?contas.length:0);
+    const total = (Array.isArray(entradas)?entradas.length:0) + (Array.isArray(gastos)?gastos.length:0) + (Array.isArray(faturas)?faturas.length:0) + (Array.isArray(contas)?contas.length:0) + (Array.isArray(holerites)?holerites.length:0);
     countEl.textContent = '· ' + total + ' lançamentos no total';
   }
 }
@@ -234,6 +237,7 @@ async function refreshData(silent){
     await loadAll();
     render();
     updateSyncLabel();
+    checarNotificacoes(false);
     if(!silent) showToast('Dados atualizados!');
   } finally {
     isRefreshing = false;
@@ -462,7 +466,7 @@ async function deleteTx(kind, id){
 
 // ===== Backup: exportar/importar todos os dados como arquivo JSON =====
 function exportarBackup(){
-  const payload = { entradas, gastos, orcamento, faturas, contas, dividas, exportadoEm: new Date().toISOString() };
+  const payload = { entradas, gastos, orcamento, faturas, contas, dividas, holerites, exportadoEm: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -478,13 +482,14 @@ async function importarBackupArquivo(file){
     const text = await file.text();
     const data = JSON.parse(text);
     if(!data.entradas || !data.gastos) throw new Error('Formato inválido');
-    entradas = data.entradas; gastos = data.gastos; orcamento = data.orcamento || orcamento; faturas = data.faturas || []; contas = data.contas || []; dividas = data.dividas || [];
+    entradas = data.entradas; gastos = data.gastos; orcamento = data.orcamento || orcamento; faturas = data.faturas || []; contas = data.contas || []; dividas = data.dividas || []; holerites = data.holerites || [];
     await persist('entradas', entradas);
     await persist('gastos', gastos);
     await persist('orcamento', orcamento);
     await persist('faturas', faturas);
     await persist('contas', contas);
     await persist('dividas', dividas);
+    await persist('holerites', holerites);
     showToast('Backup restaurado com sucesso!');
     render();
   }catch(err){
@@ -764,6 +769,11 @@ function getAlertasVencimento(janela=7){
     const dias=diasAte(prox);
     if(dias>=0 && dias<=janela) lista.push({tipo:'conta',nome:c.nome||'Conta',valor:Number(c.valor||0),data:prox,dias,id:c.id});
   });
+  (Array.isArray(dividas)?dividas:[]).filter(d=>!d.quitada && Number(d.dia||0)>0).forEach(d=>{
+    const prox=proximoVencimentoConta({dia:d.dia});
+    const dias=diasAte(prox);
+    if(dias>=0 && dias<=janela) lista.push({tipo:'divida',nome:d.nome||'Dívida',valor:Number(d.minimo||0),data:prox,dias,id:d.id});
+  });
   return lista.sort((a,b)=>a.dias-b.dias || b.valor-a.valor);
 }
 function proximoVencimentoConta(c){
@@ -808,30 +818,46 @@ function renderFaturaChart(){
 function renderFaturasContas(d){
   const fs=(Array.isArray(faturas)?faturas:[]).slice().sort((a,b)=>(b.vencimento||'').localeCompare(a.vencimento||''));
   const cs=(Array.isArray(contas)?contas:[]).slice().sort((a,b)=>Number(a.dia||0)-Number(b.dia||0));
+  const hs=(Array.isArray(holerites)?holerites:[]).slice().sort((a,b)=>(b.competencia||'').localeCompare(a.competencia||''));
   const totalAtual=faturaSeries(1)[0]?.total||0;
   const alertas=getAlertasVencimento(7);
   return `
     <section class="invoice-hero">
       <div><span class="eyebrow">Cartões neste mês</span><h2>${brl(totalAtual)}</h2><p>Soma de todas as faturas cadastradas.</p></div>
-      <label class="upload-pdf-btn" for="invoicePdf">＋ Adicionar PDF</label>
-      <input id="invoicePdf" type="file" accept="application/pdf" style="display:none" onchange="importarFaturaPDF(this)">
+      <label class="upload-pdf-btn" for="invoiceFile">＋ Adicionar fatura</label>
+      <input id="invoiceFile" type="file" accept="application/pdf,image/*" style="display:none" onchange="importarFaturaArquivo(this)">
+      <input id="invoiceCamera" type="file" accept="image/*" capture="environment" style="display:none" onchange="importarFaturaArquivo(this)">
+      <button class="secondary-btn compact-action" onclick="document.getElementById('invoiceCamera').click()">📷 Fotografar / captura</button>
     </section>
     <section class="chart-panel"><div class="panel-head"><div><span class="eyebrow">Evolução</span><h3>Faturas somadas por mês</h3></div></div>${renderFaturaChart()}</section>
     <section class="ai-panel"><div class="ai-icon">✦</div><div><span class="eyebrow">Análise automática</span>${gerarInsightsInteligentes(d).map(m=>`<p>${esc(m)}</p>`).join('')}</div></section>
-    ${alertas.length?`<section class="alert-panel"><div class="panel-head"><div><span class="eyebrow">Alerta</span><h3>Vencem em até 7 dias</h3></div></div>${alertas.map(a=>`<div class="due-row"><div class="due-icon">${a.tipo==='fatura'?'💳':'🧾'}</div><div class="due-main"><b>${esc(a.nome)}</b><span>${fmtData(a.data)}</span></div><strong>${brl(a.valor)}</strong></div>`).join('')}</section>`:''}
+    ${alertas.length?`<section class="alert-panel"><div class="panel-head"><div><span class="eyebrow">Alertas</span><h3>Vencimentos nos próximos 7 dias</h3></div></div>${alertas.map(a=>`<div class="due-row"><div class="due-icon">${a.tipo==='fatura'?'💳':a.tipo==='divida'?'⚠️':'🧾'}</div><div class="due-main"><b>${esc(a.nome)}</b><span>${a.dias===0?'vence hoje':a.dias===1?'vence amanhã':`vence em ${a.dias} dias`} · ${fmtData(a.data)}</span></div><strong>${brl(a.valor)}</strong></div>`).join('')}</section>`:''}
     <div class="section-title">Faturas cadastradas<span class="rule"></span></div>
-    <div class="invoice-list">${fs.length?fs.map(f=>`<div class="invoice-card"><div class="invoice-card-top"><div><b>${esc(f.cartao||'Cartão')}</b><span>${esc(f.competencia||'')} · vence ${fmtData(f.vencimento)}</span></div><strong>${brl(f.valor)}</strong></div><div class="invoice-actions"><button onclick="toggleFaturaPaga('${f.id}')">${f.paga?'✓ Paga':'Marcar paga'}</button><button class="danger-link" onclick="excluirFatura('${f.id}')">Excluir</button></div></div>`).join(''):`<div class="empty-state"><div class="big">💳</div>Adicione o primeiro PDF de fatura.<br>O app tenta ler cartão, total e vencimento.</div>`}</div>
+    <div class="invoice-list">${fs.length?fs.map(f=>`<div class="invoice-card"><div class="invoice-card-top"><div><b>${esc(f.cartao||'Cartão')}</b><span>${esc(f.competencia||'')} · vence ${fmtData(f.vencimento)} · ${esc(f.origem||'arquivo')}</span></div><strong>${brl(f.valor)}</strong></div><div class="invoice-actions"><button onclick="toggleFaturaPaga('${f.id}')">${f.paga?'✓ Paga':'Marcar paga'}</button><button class="danger-link" onclick="excluirFatura('${f.id}')">Excluir</button></div></div>`).join(''):`<div class="empty-state"><div class="big">💳</div>Adicione PDF, imagem ou captura de tela da fatura.<br>O app tenta identificar cartão, total e vencimento.</div>`}</div>
+
+    <div class="section-title">Holerites / receitas<span class="rule"></span></div>
+    <section class="document-panel">
+      <div><span class="eyebrow">Entrada inteligente</span><h3>Adicionar holerite</h3><p>Use PDF, imagem ou captura de tela. O app tenta localizar o valor líquido e a competência; você confirma antes de lançar como receita.</p></div>
+      <div class="document-actions">
+        <label class="upload-pdf-btn" for="payrollFile">＋ PDF ou imagem</label>
+        <input id="payrollFile" type="file" accept="application/pdf,image/*" style="display:none" onchange="importarHoleriteArquivo(this)">
+        <input id="payrollCamera" type="file" accept="image/*" capture="environment" style="display:none" onchange="importarHoleriteArquivo(this)">
+        <button class="secondary-btn" onclick="document.getElementById('payrollCamera').click()">📷 Fotografar</button>
+      </div>
+    </section>
+    <div class="invoice-list">${hs.length?hs.map(h=>`<div class="invoice-card"><div class="invoice-card-top"><div><b>${esc(PERSON_LABEL[h.pessoa]||h.pessoa||'Holerite')}</b><span>${esc(h.competencia||'')} · ${h.lancado?'lançado nas receitas':'somente arquivado'}</span></div><strong>${brl(h.liquido)}</strong></div><div class="invoice-actions"><button class="danger-link" onclick="excluirHolerite('${h.id}')">Excluir</button></div></div>`).join(''):`<div class="info-note">Nenhum holerite importado ainda.</div>`}</div>
+
     <div class="section-title">Contas recorrentes<span class="rule"></span></div>
     <div class="account-add"><input id="contaNome" placeholder="Ex: Escola"><input id="contaValor" type="number" step="0.01" placeholder="Valor"><input id="contaDia" type="number" min="1" max="31" placeholder="Dia"><button onclick="adicionarConta()">Adicionar</button></div>
     <div class="invoice-list">${cs.length?cs.map(c=>`<div class="invoice-card"><div class="invoice-card-top"><div><b>${esc(c.nome)}</b><span>todo dia ${Number(c.dia)} · próximo ${fmtData(proximoVencimentoConta(c))}</span></div><strong>${brl(c.valor)}</strong></div><div class="invoice-actions"><button class="danger-link" onclick="excluirConta('${c.id}')">Excluir</button></div></div>`).join(''):`<div class="info-note">Cadastre escola, condomínio, energia, internet ou qualquer conta mensal.</div>`}</div>
     <button class="notification-btn" onclick="ativarAlertas()">🔔 Ativar alertas de vencimento</button>
-    <div class="info-note">Os alertas aparecem sempre que o app é aberto. Notificações do aparelho dependem da permissão do navegador e são verificadas quando o app está em uso.</div>`;
+    <div class="info-note"><b>Alertas:</b> o app avisa com antecedência e também no dia do vencimento. Para notificações mesmo com o app totalmente fechado, será necessário ativarmos push pelo servidor em uma próxima etapa; nesta versão a verificação acontece ao abrir/voltar ao app e enquanto ele estiver em uso.</div>`;
 }
 
-async function importarFaturaPDF(input){
-  const file=input?.files?.[0]; if(!file) return;
-  showToast('Lendo a fatura…');
-  try{
+async function lerTextoDocumento(file, rotulo='documento'){
+  if(!file) throw new Error('Arquivo ausente');
+  const isPdf=file.type==='application/pdf' || /\.pdf$/i.test(file.name||'');
+  if(isPdf){
     const pdfjsLib=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
     pdfjsLib.GlobalWorkerOptions.workerSrc=window.PDFJS_CDN;
     const bytes=new Uint8Array(await file.arrayBuffer());
@@ -841,11 +867,36 @@ async function importarFaturaPDF(input){
       const page=await pdf.getPage(p); const tc=await page.getTextContent();
       texto+=' '+tc.items.map(i=>i.str).join(' ');
     }
-    const info=extrairDadosFatura(texto,file.name);
-    abrirConfirmacaoFatura(info,file.name);
-  }catch(err){ console.error(err); showToast('Não consegui ler esse PDF.'); }
+    if(texto.replace(/\s+/g,' ').trim().length>40) return texto;
+    if(typeof Tesseract==='undefined') return texto;
+    // PDF escaneado: converte a primeira página em imagem e aplica OCR.
+    const page=await pdf.getPage(1);
+    const viewport=page.getViewport({scale:1.7});
+    const canvas=document.createElement('canvas'); canvas.width=viewport.width; canvas.height=viewport.height;
+    await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+    const {data}=await Tesseract.recognize(canvas.toDataURL('image/jpeg',.9),'por+eng');
+    return data.text||'';
+  }
+  if(typeof Tesseract==='undefined') throw new Error('OCR indisponível');
+  const dataUrl=await reduzirImagemParaOCR(file);
+  const {data}=await Tesseract.recognize(dataUrl,'por+eng');
+  return data.text||'';
+}
+
+async function importarFaturaArquivo(input){
+  const file=input?.files?.[0]; if(!file) return;
+  showToast('Lendo a fatura…');
+  try{
+    const texto=await lerTextoDocumento(file,'fatura');
+    const info=extrairDadosFatura(texto,file.name||'captura de tela');
+    info.origem=(file.type==='application/pdf'||/\.pdf$/i.test(file.name||''))?'PDF':'imagem/captura';
+    abrirConfirmacaoFatura(info,file.name||'captura de tela');
+  }catch(err){ console.error(err); showToast('Não consegui ler esse arquivo. Confira os dados manualmente.'); }
   input.value='';
 }
+// Compatibilidade com versões anteriores.
+async function importarFaturaPDF(input){ return importarFaturaArquivo(input); }
+
 function extrairDadosFatura(texto,nomeArquivo){
   const t=String(texto||'').replace(/\s+/g,' '), up=t.toUpperCase();
   const cartoes=['NUBANK','ITAÚ','ITAU','SANTANDER','BRADESCO','INTER','C6','XP','CAIXA','BANCO DO BRASIL','SICREDI','SICOOB'];
@@ -864,12 +915,12 @@ function extrairDadosFatura(texto,nomeArquivo){
 }
 function abrirConfirmacaoFatura(info,nomeArquivo){
   const wrap=document.createElement('div'); wrap.className='modal-bg open'; wrap.id='invoiceConfirmBg';
-  wrap.innerHTML=`<div class="modal"><button class="close-x" onclick="document.getElementById('invoiceConfirmBg').remove()">✕</button><h3>Confirmar fatura</h3><div class="info-note" style="text-align:left;margin-top:0">Confira os dados que o leitor encontrou em <b>${esc(nomeArquivo)}</b>.</div><label>Cartão</label><input id="invCartao" value="${esc(info.cartao)}"><div class="row2"><div><label>Valor total</label><input id="invValor" type="number" step="0.01" value="${Number(info.valor||0).toFixed(2)}"></div><div><label>Vencimento</label><input id="invVenc" type="date" value="${esc(info.vencimento)}"></div></div><label>Competência</label><input id="invComp" type="month" value="${esc(info.competencia)}"><button class="save-btn" onclick="salvarFaturaConfirmada('${esc(nomeArquivo)}')">Salvar fatura</button></div>`;
+  wrap.innerHTML=`<div class="modal"><button class="close-x" onclick="document.getElementById('invoiceConfirmBg').remove()">✕</button><h3>Confirmar fatura</h3><div class="info-note" style="text-align:left;margin-top:0">Confira os dados que o leitor encontrou em <b>${esc(nomeArquivo)}</b>.</div><label>Cartão</label><input id="invCartao" value="${esc(info.cartao)}"><div class="row2"><div><label>Valor total</label><input id="invValor" type="number" step="0.01" value="${Number(info.valor||0).toFixed(2)}"></div><div><label>Vencimento</label><input id="invVenc" type="date" value="${esc(info.vencimento)}"></div></div><label>Competência</label><input id="invComp" type="month" value="${esc(info.competencia)}"><input id="invOrigem" type="hidden" value="${esc(info.origem||'arquivo')}"><button class="save-btn" onclick="salvarFaturaConfirmada('${esc(nomeArquivo)}')">Salvar fatura</button></div>`;
   document.getElementById('appShell').appendChild(wrap);
 }
 async function salvarFaturaConfirmada(nomeArquivo){
   faturas=await fetchLatest('faturas',faturas||[]); if(!Array.isArray(faturas))faturas=[];
-  faturas.push({id:uid(),cartao:document.getElementById('invCartao').value.trim()||'Cartão',valor:Number(document.getElementById('invValor').value)||0,vencimento:document.getElementById('invVenc').value,competencia:document.getElementById('invComp').value,arquivo:nomeArquivo,paga:false,criadoEm:new Date().toISOString()});
+  faturas.push({id:uid(),cartao:document.getElementById('invCartao').value.trim()||'Cartão',valor:Number(document.getElementById('invValor').value)||0,vencimento:document.getElementById('invVenc').value,competencia:document.getElementById('invComp').value,arquivo:nomeArquivo,origem:document.getElementById('invOrigem')?.value||'arquivo',paga:false,criadoEm:new Date().toISOString()});
   await persist('faturas',faturas); document.getElementById('invoiceConfirmBg')?.remove(); render(); updateSyncLabel(); showToast('Fatura adicionada!'); checarNotificacoes();
 }
 async function toggleFaturaPaga(id){ faturas=await fetchLatest('faturas',faturas||[]); const f=faturas.find(x=>x.id===id); if(f)f.paga=!f.paga; await persist('faturas',faturas); render(); }
@@ -886,11 +937,23 @@ async function ativarAlertas(){
 }
 async function checarNotificacoes(forcar=false){
   if(!('Notification' in window)||Notification.permission!=='granted')return;
-  const alertas=getAlertasVencimento(2); if(!alertas.length)return;
-  const chave='fin_last_notify_'+isoHoje(); if(!forcar&&localStorage.getItem(chave))return;
-  const body=alertas.slice(0,3).map(a=>`${a.nome}: ${brl(a.valor)} · ${a.dias===0?'hoje':a.dias===1?'amanhã':`em ${a.dias} dias`}`).join('\n');
-  try{ const reg=await navigator.serviceWorker?.ready; if(reg) await reg.showNotification('Contas próximas do vencimento',{body,icon:'icons/icon-192.png',tag:'finance-due'}); else new Notification('Contas próximas do vencimento',{body}); localStorage.setItem(chave,'1'); }catch(e){}
+  const alertas=getAlertasVencimento(7).filter(a=>[7,3,2,1,0].includes(a.dias));
+  if(!alertas.length)return;
+  for(const a of alertas){
+    const chave=`fin_notify_${isoHoje()}_${a.tipo}_${a.id}_${a.dias}`;
+    if(!forcar && localStorage.getItem(chave)) continue;
+    const quando=a.dias===0?'VENCE HOJE':a.dias===1?'vence amanhã':`vence em ${a.dias} dias`;
+    const titulo=a.dias===0?'⚠️ Vencimento hoje':'🔔 Vencimento próximo';
+    const body=`${a.nome}: ${brl(a.valor)} · ${quando}`;
+    try{
+      const reg=await navigator.serviceWorker?.ready;
+      if(reg) await reg.showNotification(titulo,{body,icon:'icons/icon-192.png',badge:'icons/icon-192.png',tag:`finance-due-${a.tipo}-${a.id}-${a.dias}`,renotify:true});
+      else new Notification(titulo,{body});
+      localStorage.setItem(chave,'1');
+    }catch(e){}
+  }
 }
+
 async function forceAppUpdate(){
   try{ const regs=await navigator.serviceWorker.getRegistrations(); for(const r of regs) await r.update(); showToast('Atualização verificada. Reabrindo…'); setTimeout(()=>location.reload(true),600); }catch(e){ location.reload(true); }
 }
@@ -927,6 +990,73 @@ function gerarPlanoDividas(d){
   if(extra>0) passos.push(`Direcione até ${brl(extra)} como pagamento extra para ${alvo.nome}, sem criar nova dívida para isso.`);
   passos.push(`Quando ${alvo.nome} for quitada, transfira o valor que era pago nela para a próxima dívida da lista.`);
   return {resumo,total,minimos,extra,alvo,passos,vencimentos,reservaOperacional};
+}
+
+function mesNumeroPorNome(txt){
+  const meses={JANEIRO:1,FEVEREIRO:2,FEV:2,MARCO:3,'MARÇO':3,ABRIL:4,MAIO:5,JUNHO:6,JULHO:7,AGOSTO:8,SETEMBRO:9,OUTUBRO:10,NOVEMBRO:11,DEZEMBRO:12};
+  const up=String(txt||'').toUpperCase();
+  for(const [nome,n] of Object.entries(meses)){ if(up.includes(nome)) return n; }
+  return null;
+}
+function extrairDadosHolerite(texto,nomeArquivo){
+  const t=normalizarTextoOCR(texto), up=t.toUpperCase();
+  let liquido=0;
+  const patterns=[
+    /(?:VALOR\s+L[IÍ]QUIDO|L[IÍ]QUIDO\s+A\s+RECEBER|TOTAL\s+L[IÍ]QUIDO|SAL[AÁ]RIO\s+L[IÍ]QUIDO|L[IÍ]QUIDO)[^0-9R$]{0,35}(?:R\$\s*)?([0-9\.]+,[0-9]{2})/gi,
+    /(?:R\$\s*)([0-9\.]+,[0-9]{2})/g
+  ];
+  for(const re of patterns){ const ms=[...t.matchAll(re)]; if(ms.length){ const vals=ms.map(m=>parseValorBR(m[1])).filter(v=>v>0&&v<1000000); if(vals.length){liquido=patterns.indexOf(re)===0?vals[0]:Math.max(...vals);break;} } }
+  let competencia='';
+  const comp=t.match(/(?:COMPET[EÊ]NCIA|REFER[EÊ]NCIA|M[EÊ]S\/ANO)[^0-9A-Z]{0,20}(\d{1,2})[\/\-.](20\d{2})/i);
+  if(comp) competencia=`${comp[2]}-${String(Number(comp[1])).padStart(2,'0')}`;
+  if(!competencia){
+    const ano=(t.match(/\b(20\d{2})\b/)||[])[1]; const mes=mesNumeroPorNome(up);
+    if(ano&&mes) competencia=`${ano}-${String(mes).padStart(2,'0')}`;
+  }
+  if(!competencia) competencia=new Date().toISOString().slice(0,7);
+  let pessoa='FERNANDO';
+  if(/VANESSA/i.test(up)) pessoa='VANESSA';
+  else if(/FERNANDO/i.test(up)) pessoa='FERNANDO';
+  return {liquido,competencia,pessoa,arquivo:nomeArquivo||'holerite'};
+}
+async function importarHoleriteArquivo(input){
+  const file=input?.files?.[0]; if(!file)return;
+  showToast('Lendo o holerite…');
+  try{
+    const texto=await lerTextoDocumento(file,'holerite');
+    abrirConfirmacaoHolerite(extrairDadosHolerite(texto,file.name||'captura de tela'));
+  }catch(err){console.error(err);showToast('Não consegui ler esse holerite. Tente outra imagem ou PDF.');}
+  input.value='';
+}
+function abrirConfirmacaoHolerite(info){
+  const wrap=document.createElement('div'); wrap.className='modal-bg open'; wrap.id='payrollConfirmBg';
+  wrap.innerHTML=`<div class="modal"><button class="close-x" onclick="document.getElementById('payrollConfirmBg').remove()">✕</button><h3>Confirmar holerite</h3><div class="info-note" style="text-align:left;margin-top:0">Confira o valor líquido e a competência. Nada é lançado sem sua confirmação.</div><label>Pessoa</label><select id="payPessoa"><option value="FERNANDO" ${info.pessoa==='FERNANDO'?'selected':''}>Fernando</option><option value="VANESSA" ${info.pessoa==='VANESSA'?'selected':''}>Vanessa</option></select><div class="row2"><div><label>Valor líquido</label><input id="payLiquido" type="number" step="0.01" value="${Number(info.liquido||0).toFixed(2)}"></div><div><label>Competência</label><input id="payComp" type="month" value="${esc(info.competencia)}"></div></div><label class="check-row"><input id="payLancar" type="checkbox" checked> Lançar automaticamente este valor como receita do mês</label><input id="payArquivo" type="hidden" value="${esc(info.arquivo)}"><button class="save-btn" onclick="salvarHoleriteConfirmado()">Salvar holerite</button></div>`;
+  document.getElementById('appShell').appendChild(wrap);
+}
+async function salvarHoleriteConfirmado(){
+  const pessoa=document.getElementById('payPessoa').value;
+  const liquido=Number(document.getElementById('payLiquido').value)||0;
+  const competencia=document.getElementById('payComp').value;
+  const lancar=document.getElementById('payLancar').checked;
+  const arquivo=document.getElementById('payArquivo').value;
+  if(liquido<=0||!competencia){showToast('Confira valor e competência.');return;}
+  holerites=await fetchLatest('holerites',holerites||[]); if(!Array.isArray(holerites))holerites=[];
+  const id=uid();
+  holerites.push({id,pessoa,liquido,competencia,arquivo,lancado:lancar,criadoEm:new Date().toISOString()});
+  await persist('holerites',holerites);
+  if(lancar){
+    entradas=await fetchLatest('entradas',entradas||[]); if(!Array.isArray(entradas))entradas=[];
+    const existe=entradas.some(e=>e.origemHoleriteId===id);
+    if(!existe){entradas.push({id:uid(),data:`${competencia}-01`,tipo:'Salário',descricao:'Importado do holerite',valor:liquido,pessoa,origemHoleriteId:id}); await persist('entradas',entradas);}
+  }
+  document.getElementById('payrollConfirmBg')?.remove(); render(); updateSyncLabel(); showToast('Holerite salvo!');
+}
+async function excluirHolerite(id){
+  if(!confirm('Excluir este holerite?'))return;
+  holerites=await fetchLatest('holerites',holerites||[]); const h=holerites.find(x=>x.id===id);
+  holerites=holerites.filter(x=>x.id!==id); await persist('holerites',holerites);
+  if(h?.lancado){entradas=await fetchLatest('entradas',entradas||[]); entradas=entradas.filter(e=>e.origemHoleriteId!==id); await persist('entradas',entradas);}
+  render(); updateSyncLabel();
 }
 
 async function adicionarDivida(){
